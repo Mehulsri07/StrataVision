@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   check:
-    name: Typecheck, lint, frontend build
+    name: Typecheck, lint, tests, frontend build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -36,6 +36,9 @@ jobs:
 
       - name: Lint
         run: npm run lint
+
+      - name: Test
+        run: npm test
 
       - name: Build frontend
         run: npm run build -w app

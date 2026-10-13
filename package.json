@@ -17,7 +17,8 @@
     "build": "npm run tauri -w app -- build",
     "typecheck": "npm run typecheck -w app",
     "lint": "eslint app e2e",
-    "smoke": "node e2e/smoke.mjs"
+    "smoke": "node e2e/smoke.mjs",
+    "test": "npm test -w app"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.0",
