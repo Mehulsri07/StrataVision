@@ -100,10 +100,12 @@ surface down to the deepest depth any voter reaches. Each step has:
 
 1. **Common height.** Each borewell's layers are placed by height above sea level: ground height
    minus depth. Ground height is the borewell's own `groundElevationM` when recorded, otherwise the
-   elevation grid. Depths in metres are converted to feet. The asked point's ground height comes from
-   the grid; results are shown as depth below ground at that point.
+   elevation grid. Layer depths are always feet (StrataField converts logs written in metres when it
+   reads them). The asked point's ground height comes from the grid; results are shown as depth below
+   ground at that point.
 2. **Who votes.** For a step, a borewell votes if it is within 5 km, has a location, and has a
-   recorded layer covering the middle of that step's height. The 12 nearest such borewells are used.
+   recorded layer covering the middle of that step's height. The 12 nearest such borewells are used,
+   with at most 3 from any one spot, so a place with many logs cannot fill the room.
 3. **Weight.** `1 / distance²` (distance floored at 25 m), multiplied by:
    - record quality: good 1.0, fair or unknown 0.7, poor 0.4;
    - location: 0.5 if the location came from an address lookup, otherwise 1.0;
@@ -120,14 +122,17 @@ least 7 times in 10.
 
 ### Accuracy check
 
-`checkModel(borewells, grid)` hides each borewell in turn, predicts its column from the rest, and
-compares step by step against what was recorded. It returns:
+`checkModel(borewells, grid)` hides each borewell in turn, together with every other borewell at the
+same spot (two logs of one spot agreeing says nothing about a place nobody drilled), predicts its
+column from the rest, and compares step by step against what was recorded. It returns:
 
 - the share of steps where `likely` matched the recorded group, overall and separately for
   `likely` and `rough` steps;
-- the same split by distance to the nearest other borewell: under 1 km, 1 to 3 km, over 3 km;
-- **odd ones out**: borewells whose own match is far below the others near them (under half the
-  typical match for their distance band, with at least 10 comparable steps), worst first.
+- the best guess scored for every step, split by how far away the nearest borewell behind that step
+  was: under 1 km, 1 to 3 km, over 3 km;
+- **odd ones out**: borewells whose own match is far below what is usual at that distance (under
+  half the typical match in a distance band, on at least 10 comparable steps and against at least 5
+  borewells), worst first.
 
 With fewer than 10 usable borewells it reports that it cannot judge yet.
 

@@ -2,9 +2,9 @@ mod data;
 
 use tauri::Manager;
 
-/// Every borewell in StrataField's records, read afresh each time the screens ask.
+/// StrataField's records, read afresh each time the screens ask.
 #[tauri::command]
-fn load_data(app: tauri::AppHandle) -> Result<Vec<data::SiteRecord>, data::LoadError> {
+fn load_data(app: tauri::AppHandle) -> Result<data::Records, data::LoadError> {
     let roaming = app.path().data_dir()?;
     data::load(&data::data_dir(&roaming))
 }
