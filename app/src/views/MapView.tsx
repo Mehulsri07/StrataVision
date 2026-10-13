@@ -1,19 +1,23 @@
 import { useMemo, useState } from "react";
-import type { Borewell } from "@strata/core";
-import { ProposedColumn, RecordedColumn } from "@/components/ColumnDrawing";
+import { kmBetween, type Borewell } from "@strata/core";
+import { NOTHING_PROPOSED, NothingProposedPattern, ProposedColumn, RecordedColumn } from "@/components/ColumnDrawing";
 import { SiteMap, located } from "@/components/SiteMap";
 import type { Records, SiteRecord } from "@/lib/api";
 import type { Model } from "@/lib/useModel";
-import { predictColumn, type Step } from "@/model/model";
-import { GROUP_COLOUR, distanceInWords, sharesInWords, waterHere } from "@/model/words";
+import { predictColumn } from "@/model/model";
+import { GROUP_COLOUR, blocks, distanceInWords, sharesInWords, summary, waterHere, type Block } from "@/model/words";
 import { text } from "@/text";
 
 type Chosen = { borewell: string } | { spot: [number, number] } | null;
+
+/** Borewells closer than this are at the same spot on the map: their pins lie on top of each other. */
+const SAME_PIN_KM = 0.005;
 
 /** The map with its side panel: what was recorded at a borewell, or what is proposed at any other spot. */
 export function MapView({ records, model, onHowGood }: { records: Records; model: Model | "failed" | null; onHowGood: () => void }) {
   const { sites } = records;
   const [chosen, setChosen] = useState<Chosen>(null);
+  const borewells = useMemo(() => sites.map((s) => s.borewell), [sites]);
 
   const shown = located(sites).length;
   // A borewell deleted in StrataField since it was selected is simply no longer selected.
@@ -21,6 +25,7 @@ export function MapView({ records, model, onHowGood }: { records: Records; model
   const spot = chosen && "spot" in chosen ? chosen.spot : null;
   return (
     <div className="flex min-h-0 flex-1">
+      <NothingProposedPattern />
       <div className="min-w-0 flex-1">
         <SiteMap sites={sites} selectedId={site?.borewell.id ?? null} picked={spot} onSelect={(id) => setChosen({ borewell: id })} onPick={(lat, lon) => setChosen({ spot: [lat, lon] })} />
       </div>
@@ -30,9 +35,9 @@ export function MapView({ records, model, onHowGood }: { records: Records; model
           {sites.length > shown && <p className="text-muted-foreground">{text.notShown(sites.length - shown)}</p>}
         </div>
         <div className="space-y-3 border-t pt-4">
-          {site ? <Recorded site={site} />
+          {site ? <Recorded site={site} sites={sites} onSelect={(id) => setChosen({ borewell: id })} />
             // Keyed by the spot, so a layer selected at one spot is not carried to the next.
-            : spot ? <Proposed key={spot.join()} spot={spot} model={model} borewells={sites.map((s) => s.borewell)} onHowGood={onHowGood} />
+            : spot ? <Proposed key={spot.join()} spot={spot} model={model} borewells={borewells} onHowGood={onHowGood} />
             : <p className="text-muted-foreground">{text.pickHint}</p>}
         </div>
       </aside>
@@ -40,9 +45,26 @@ export function MapView({ records, model, onHowGood }: { records: Records; model
   );
 }
 
-function Recorded({ site: { borewell: b, strata } }: { site: SiteRecord }) {
+function Recorded({ site: { borewell: b, strata }, sites, onSelect }: { site: SiteRecord; sites: SiteRecord[]; onSelect: (id: string) => void }) {
+  // Pins at one spot lie on top of each other and only the top one can be clicked, so the others are offered here.
+  const here = b.latitude == null || b.longitude == null ? [] : located(sites).filter((s) => kmBetween(b.latitude!, b.longitude!, s.borewell.latitude!, s.borewell.longitude!) <= SAME_PIN_KM);
   return (
     <>
+      {here.length > 1 && (
+        <div className="space-y-1 rounded-md border p-3">
+          <p className="text-muted-foreground">{text.atThisSpot(here.length)}</p>
+          <ul className="flex flex-wrap gap-1">
+            {here.map((s) => (
+              <li key={s.borewell.id}>
+                <button type="button" onClick={() => onSelect(s.borewell.id)} aria-pressed={s.borewell.id === b.id}
+                  className={`rounded px-2 py-0.5 ${s.borewell.id === b.id ? "bg-secondary font-medium" : "text-primary underline underline-offset-2"}`}>
+                  {s.borewell.borewellId}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       <h2 className="text-base font-semibold">{b.borewellId}</h2>
       <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
         <dt className="text-muted-foreground">{text.area}</dt><dd>{b.area || text.notRecorded}</dd>
@@ -50,7 +72,9 @@ function Recorded({ site: { borewell: b, strata } }: { site: SiteRecord }) {
         <dt className="text-muted-foreground">{text.drilled}</dt><dd>{b.date || text.notRecorded}</dd>
       </dl>
       <h3 className="font-medium">{text.recordedLayers}</h3>
-      {strata.length > 0 ? <RecordedColumn strata={strata} waterFt={b.waterLevel} /> : <p className="text-muted-foreground">{text.noLayers}</p>}
+      {strata.length > 0
+        ? <RecordedColumn strata={strata} water={b.waterLevel != null ? { feet: b.waterLevel, year: b.waterLevelOn?.slice(0, 4) || null } : null} />
+        : <p className="text-muted-foreground">{text.noLayers}</p>}
       <p className="text-muted-foreground">{text.openInStrataField}</p>
     </>
   );
@@ -65,46 +89,50 @@ function Proposed({ spot, model, borewells, onHowGood }: { spot: [number, number
 
   const heading = <h2 className="text-base font-semibold">{text.proposedHere}</h2>;
   const howGood = <button type="button" className="text-primary underline underline-offset-2" onClick={onHowGood}>{text.howGood}</button>;
+  const waterLine = <p>{water ? text.waterExpected(Math.round(water.feet), distanceInWords(water.nearestKm), water.since) : text.noWater}</p>;
   if (model === "failed") return <>{heading}<p>{text.groundFailed}</p></>;
   if (!ready) return <>{heading}<p className="text-muted-foreground">{text.readingGround}</p></>;
-  if (!column || !column.some((s) => s.likely)) return <>{heading}<p>{text.notEnoughHere}</p>{howGood}</>;
+  // Outside the ground-height data nothing can be placed by height, whatever borewells are near.
+  if (!column) return <>{heading}<p>{text.noGroundHere}</p>{waterLine}{howGood}</>;
+  if (!column.some((s) => s.likely)) return <>{heading}<p>{text.notEnoughHere}</p>{waterLine}{howGood}</>;
 
+  // Only the borewells behind what is actually proposed, not those behind stretches left empty.
   const behind = new Map<string, number>();
-  for (const step of column) for (const s of step.sources) behind.set(s.id, s.km);
+  for (const step of column) if (step.likely) for (const s of step.sources) behind.set(s.id, s.km);
+  // The selected stretch, if it still exists: after a reload the layers may have moved.
+  const selected = picked ? blocks(column).find((b) => b.top === picked.top && b.bottom === picked.bottom) ?? null : null;
   return (
     <>
       {heading}
       <p>{text.fromBorewells(behind.size, distanceInWords(Math.min(...behind.values())))}</p>
-      <p>{water ? text.waterExpected(Math.round(water.feet), water.since) : text.noWater}</p>
-      <ProposedColumn column={column} waterFt={water?.feet} selected={picked} onSelect={(b) => setPicked({ top: b.top, bottom: b.bottom })} />
+      {waterLine}
+      <ProposedColumn column={column} waterFt={water?.feet} selected={selected} onSelect={(b) => setPicked({ top: b.top, bottom: b.bottom })} />
       <ul className="space-y-1 text-muted-foreground">
         <li className="flex items-center gap-2"><Swatch opacity={0.6} dash="6 4" />{text.levelMeaning.likely}</li>
         <li className="flex items-center gap-2"><Swatch opacity={0.3} dash="1.5 4" />{text.levelMeaning.rough}</li>
         <li className="flex items-center gap-2"><Swatch />{text.levelMeaning.none}</li>
       </ul>
-      {picked ? <BlockDetails column={column} top={picked.top} bottom={picked.bottom} /> : <p className="text-muted-foreground">{text.clickLayer}</p>}
+      {selected ? <BlockDetails block={selected} /> : <p className="text-muted-foreground">{text.clickLayer}</p>}
       {howGood}
     </>
   );
 }
 
 /** What a selected stretch of the column is made of, and the borewells it was worked out from. */
-function BlockDetails({ column, top, bottom }: { column: readonly Step[]; top: number; bottom: number }) {
-  const steps = column.filter((s) => s.top >= top && s.bottom <= bottom);
-  const step = steps[Math.floor(steps.length / 2)];
-  if (!step) return null; // the records changed and this stretch is gone
-  const sources = step.sources.slice(0, 8);
+function BlockDetails({ block }: { block: Block }) {
+  const { shares, sources } = summary(block);
+  const first = sources.slice(0, 8);
   return (
     <div className="space-y-1 rounded-md border p-3">
-      <p className="font-medium">{text.depths(top, bottom)}</p>
-      <p>{step.likely && step.shares ? sharesInWords(step.shares) : text.levels.none}</p>
-      <p className="text-muted-foreground">{text.levelMeaning[step.confidence]}</p>
-      {sources.length > 0 && (
+      <p className="font-medium">{text.depths(block.top, block.bottom)}</p>
+      <p>{shares ? sharesInWords(shares) : text.levels.none}</p>
+      <p className="text-muted-foreground">{text.levelMeaning[block.level]}</p>
+      {first.length > 0 && (
         <>
           <p className="pt-1 text-muted-foreground">{text.workedOutFrom}</p>
           <ul>
-            {sources.map((s) => <li key={s.id}>{s.borewellId} · {distanceInWords(s.km)}</li>)}
-            {step.sources.length > sources.length && <li className="text-muted-foreground">{text.andMore(step.sources.length - sources.length)}</li>}
+            {first.map((s) => <li key={s.id}>{s.borewellId} · {distanceInWords(s.km)}</li>)}
+            {sources.length > first.length && <li className="text-muted-foreground">{text.andMore(sources.length - first.length)}</li>}
           </ul>
         </>
       )}
@@ -116,14 +144,9 @@ function BlockDetails({ column, top, bottom }: { column: readonly Step[]; top: n
 function Swatch({ opacity, dash }: { opacity?: number; dash?: string }) {
   return (
     <svg width="18" height="14" className="shrink-0" aria-hidden="true">
-      <defs>
-        <pattern id="swatch-nothing" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-          <line x1="0" y1="0" x2="0" y2="5" stroke="var(--muted-foreground)" strokeOpacity="0.5" />
-        </pattern>
-      </defs>
       {opacity
         ? <rect x="1" y="1" width="16" height="12" fill={GROUP_COLOUR.waterBearing} fillOpacity={opacity} stroke="var(--foreground)" strokeOpacity="0.55" strokeDasharray={dash} />
-        : <rect x="1" y="1" width="16" height="12" fill="url(#swatch-nothing)" />}
+        : <rect x="1" y="1" width="16" height="12" fill={NOTHING_PROPOSED} stroke="var(--muted-foreground)" strokeOpacity="0.3" strokeDasharray="1.5 4" />}
     </svg>
   );
 }

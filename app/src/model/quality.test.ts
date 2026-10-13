@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { CheckResult } from "./check";
-import { qualitySentences } from "./quality";
+import { matchedInWords, qualitySentences } from "./quality";
 
-const t = (right: number, steps: number) => ({ right, steps });
+const t = (right: number, steps: number, borewells = 20) => ({ right, steps, borewells });
 const result = (over: Partial<CheckResult>): CheckResult => ({
   canJudge: true, compared: 40, overall: t(150, 200), likely: t(90, 100), rough: t(60, 100), none: t(3, 10),
   byDistance: { under1: t(95, 100), from1to3: t(0, 0), over3: t(25, 100) }, oddOnesOut: [], ...over,
@@ -30,6 +30,15 @@ describe("qualitySentences", () => {
     expect(sentences).toHaveLength(4); // checked, likely, under 1 km, over 3 km
     expect(sentences.join(" ")).not.toContain("Rough guess");
     expect(sentences.join(" ")).not.toContain("1 to 3 km");
+  });
+
+  it("leaves out a line that rests on one deep borewell, however many steps that is", () => {
+    const sentences = qualitySentences(result({ byDistance: { under1: t(95, 100), from1to3: t(0, 0), over3: t(60, 60, 1) } }));
+    expect(sentences.join(" ")).not.toContain("more than 3 km");
+  });
+
+  it("says what the odd ones matched in feet", () => {
+    expect(matchedInWords({ right: 3, steps: 24 })).toBe("15 of 120 ft");
   });
 
   it("says nothing when there are too few borewells to judge", () => {

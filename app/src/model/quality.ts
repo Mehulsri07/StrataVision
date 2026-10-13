@@ -1,5 +1,5 @@
 import { text } from "@/text";
-import { MIN_STEPS_TO_SAY } from "./constants";
+import { MIN_BOREWELLS_TO_SAY, MIN_STEPS_TO_SAY, STEP_FT } from "./constants";
 import { share, type CheckResult, type Tally } from "./check";
 import { howOften } from "./words";
 
@@ -17,6 +17,9 @@ export function qualitySentences(check: CheckResult): string[] {
   ];
   return [t.checked(check.compared), ...lines.flatMap(([tally, say]) => {
     const right = share(tally);
-    return right == null || tally.steps < MIN_STEPS_TO_SAY ? [] : [say(howOften(right))];
+    return right == null || tally.steps < MIN_STEPS_TO_SAY || tally.borewells < MIN_BOREWELLS_TO_SAY ? [] : [say(howOften(right))];
   })];
 }
+
+/** How much of an odd borewell matched its surroundings, in feet: "15 of 120 ft". */
+export const matchedInWords = (odd: { right: number; steps: number }) => text.quality.matchedFeet(odd.right * STEP_FT, odd.steps * STEP_FT);

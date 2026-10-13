@@ -30,9 +30,11 @@ export function SiteMap({ sites, selectedId, picked, onSelect, onPick }: {
         maxZoom={19}
       />
       <FitOnce pins={pins} />
+      <KeepSize />
       <PickOnMapClick onPick={onPick} />
       {/* ponytail: no grouping, so borewells at exactly the same spot sit on top of each other and
-          only the top one can be clicked. Group them (as StrataField does) if that gets in the way. */}
+          only the top one can be clicked; the side panel then offers the others. Group the pins
+          (as StrataField does) if that is not enough. */}
       {pins.map(({ borewell: b }) => {
         const selected = b.id === selectedId;
         return (
@@ -64,6 +66,20 @@ function FitOnce({ pins }: { pins: SiteRecord[] }) {
     map.fitBounds(bounds, { padding: [40, 40], maxZoom: 14 });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [any, map]);
+  return null;
+}
+
+/**
+ * Leaflet remembers how big the map was. While Data quality is showing the map is hidden (no size
+ * at all), so it is measured again whenever its box changes, or it would come back blank or shifted.
+ */
+function KeepSize() {
+  const map = useMap();
+  useEffect(() => {
+    const watcher = new ResizeObserver(() => map.invalidateSize());
+    watcher.observe(map.getContainer());
+    return () => watcher.disconnect();
+  }, [map]);
   return null;
 }
 

@@ -38,8 +38,12 @@ export const ROUGH = { nearestKm: 3, sites: 2 };
 /** With fewer borewells than this to compare, the accuracy check says it cannot judge. */
 export const MIN_BOREWELLS_TO_JUDGE = 10;
 
-/** A share right is only put into words when it rests on at least this many compared steps. */
+/**
+ * A share right is only put into words when it rests on at least this many compared steps, from at
+ * least this many borewells (steps down one borewell are not independent).
+ */
 export const MIN_STEPS_TO_SAY = 50;
+export const MIN_BOREWELLS_TO_SAY = 5;
 
 /**
  * A borewell is an odd one out when it matches its surroundings less than this fraction as often as

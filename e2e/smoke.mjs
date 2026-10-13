@@ -12,7 +12,8 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import process from "node:process";
 
-const PORT = 9333;
+// Each start of the app gets its own port: the last one's window can take a moment to let go of its own.
+let port = 9332;
 const root = resolve(import.meta.dirname, "..");
 const exe = join(root, "target/debug/stratavision.exe");
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -24,7 +25,7 @@ if (!existsSync(exe)) {
 
 /** Sends one command to the app's page through the WebView's debugging connection. */
 async function send(method, params = {}) {
-  const pages = await (await fetch(`http://127.0.0.1:${PORT}/json`)).json();
+  const pages = await (await fetch(`http://127.0.0.1:${port}/json`)).json();
   const page = pages.find((p) => p.type === "page" && p.webSocketDebuggerUrl);
   if (!page) throw new Error("no page yet");
   const ws = new WebSocket(page.webSocketDebuggerUrl);
@@ -67,17 +68,18 @@ async function expectScreen(expected) {
 
 /** Runs `steps` against the app started on `dataDir`, and always stops the app afterwards. */
 async function withApp(dataDir, steps) {
+  port++;
   const app = spawn(exe, [], {
     stdio: ["ignore", "ignore", "inherit"], // a crash at start-up should be visible in the log
     // Development builds open the window's debugging port when asked (see open_main_window in
     // app/src-tauri/src/lib.rs).
-    env: { ...process.env, STRATA_DATA_DIR: dataDir, STRATA_E2E_DEBUG_PORT: String(PORT) },
+    env: { ...process.env, STRATA_DATA_DIR: dataDir, STRATA_E2E_DEBUG_PORT: String(port) },
   });
   try {
     await steps();
   } finally {
     app.kill();
-    await sleep(1000); // let it go before the next one asks for the same port
+    await sleep(1000);
   }
 }
 
@@ -95,7 +97,7 @@ const scenarios = {
     });
     try {
       await withApp(dataDir, async () => {
-        await expectScreen("25 borewells on the map");
+        await expectScreen("26 borewells on the map");
         await sleep(2500); // the map settles on the borewells
         // The middle of the map is the middle borewell; a little to one side is open ground.
         const [x, y] = await js("(() => { const r = document.querySelector('.leaflet-container').getBoundingClientRect(); return [r.x + r.width / 2 + 60, r.y + r.height / 2 + 45]; })()");
@@ -103,12 +105,16 @@ const scenarios = {
         await expectScreen("Proposed layers here");
         await expectScreen("Water-bearing sand");
         await expectScreen("Water level expected about");
+        await expectScreen("levels measured since 2023");
+        // The middle pin is two borewells on top of each other; the panel offers both.
+        await click(x - 60, y - 45);
+        await expectScreen("2 borewells are at this spot:");
         await js("[...document.querySelectorAll('header button')].find((b) => b.innerText.trim() === 'Data quality').click()");
-        await expectScreen("Checked against 25 borewells");
+        await expectScreen("Checked against 26 borewells");
         await expectScreen("BW-008"); // the one logged upside down
       });
     } finally {
-      rmSync(dataDir, { recursive: true, force: true });
+      rmSync(dataDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 500 }); // the app may still be letting go
     }
   },
 };

@@ -1,5 +1,5 @@
 import type { Model } from "@/lib/useModel";
-import { qualitySentences } from "@/model/quality";
+import { matchedInWords, qualitySentences } from "@/model/quality";
 import { howOften } from "@/model/words";
 import { text } from "@/text";
 
@@ -31,7 +31,7 @@ export function QualityView({ model }: { model: Model | "failed" | null }) {
                         {check.oddOnesOut.map((o) => (
                           <tr key={o.id} className="border-t">
                             <td className="py-1.5 pr-4 font-medium">{o.borewellId}</td>
-                            <td className="py-1.5">{t.matchedSteps(o.right, o.steps)} <span className="text-muted-foreground">({t.usually(howOften(o.typical))})</span></td>
+                            <td className="py-1.5">{matchedInWords(o)} <span className="text-muted-foreground">({t.others(howOften(o.typical))})</span></td>
                           </tr>
                         ))}
                       </tbody>

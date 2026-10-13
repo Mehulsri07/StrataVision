@@ -3,7 +3,7 @@ import type { Borewell } from "@strata/core";
 import type { Group } from "./groups";
 import type { Step } from "./model";
 import { CENTRE, east, north } from "./testGround";
-import { blocks, distanceInWords, howOften, sharesInWords, waterHere } from "./words";
+import { blocks, distanceInWords, howOften, sharesInWords, summary, waterHere } from "./words";
 
 const shares = (clay: number, fineSand: number, waterBearing: number, hard: number) => ({ clay, fineSand, waterBearing, hard });
 
@@ -55,7 +55,7 @@ describe("waterHere", () => {
     ({ latitude: north(0), longitude: east(km), waterLevel, waterLevelOn }) as Borewell;
   const here = (borewells: Borewell[]) => waterHere(CENTRE[0], CENTRE[1], borewells);
 
-  it("estimates from a recent reading nearby, and says since when", () => {
+  it("estimates from a recent reading nearby, and says since when and how near", () => {
     const got = here([well(0.5, 60, "2026-03-01")])!;
     expect(got.feet).toBe(60);
     expect(got.nearestKm).toBeCloseTo(0.5, 2);
@@ -63,13 +63,13 @@ describe("waterHere", () => {
   });
 
   it("leans towards the nearer reading", () => {
-    const got = here([well(0.5, 60, "2026-03-01"), well(-2, 100, "2026-01-01")])!;
+    const got = here([well(0.3, 60, "2026-03-01"), well(-0.9, 100, "2026-01-01")])!;
     expect(got.feet).toBeGreaterThan(60);
     expect(got.feet).toBeLessThan(65);
   });
 
-  it("says nothing when the nearest recent reading is more than 3 km away", () => {
-    expect(here([well(4, 60, "2026-03-01")])).toBeNull();
+  it("says nothing when the nearest recent reading is more than 1 km away", () => {
+    expect(here([well(1.2, 60, "2026-03-01")])).toBeNull();
   });
 
   it("says nothing with no water levels at all", () => {
@@ -82,8 +82,38 @@ describe("waterHere", () => {
     expect(got.feet).toBe(60);
   });
 
-  it("ignores readings beyond 3 km even when a nearer one exists", () => {
-    const got = here([well(0.5, 60, "2026-03-01"), well(4.5, 500, "2026-03-01")])!;
+  it("does not use a reading with no date: nobody can say it is recent", () => {
+    const got = here([well(0.2, 20, null), well(0.5, 60, "2026-03-01")])!;
     expect(got.feet).toBe(60);
+    expect(here([well(0.2, 20, null)])).toBeNull();
+  });
+
+  it("ignores readings beyond 1 km even when a nearer one exists", () => {
+    const got = here([well(0.5, 60, "2026-03-01"), well(1.5, 500, "2026-03-01")])!;
+    expect(got.feet).toBe(60);
+  });
+});
+
+describe("summary of a stretch", () => {
+  const source = (id: string, km: number) => ({ id, borewellId: id.toUpperCase(), km, weight: 1 });
+  const step = (top: number, clay: number, sources: ReturnType<typeof source>[]): Step =>
+    ({ top, bottom: top + 5, shares: shares(clay, 0, 1 - clay, 0), likely: "clay", confidence: "likely", sources });
+
+  it("averages what the steps say, so a mixed lower part is not lost", () => {
+    const [block] = blocks([step(0, 1, [source("a", 0.2)]), step(5, 1, [source("a", 0.2)]), step(10, 0.6, [source("a", 0.2), source("b", 0.5)]), step(15, 0.6, [source("b", 0.5)])]);
+    const got = summary(block);
+    expect(got.shares!.clay).toBeCloseTo(0.8, 6);
+    expect(got.shares!.waterBearing).toBeCloseTo(0.2, 6);
+    expect(sharesInWords(got.shares!)).toBe("Mostly clay, some water-bearing sand");
+  });
+
+  it("lists every borewell behind the stretch once, nearest first", () => {
+    const [block] = blocks([step(0, 1, [source("far", 0.9), source("near", 0.2)]), step(5, 1, [source("near", 0.2), source("mid", 0.5)])]);
+    expect(summary(block).sources.map((s) => s.id)).toEqual(["near", "mid", "far"]);
+  });
+
+  it("proposes nothing, and names nobody, where there is not enough data", () => {
+    const lonely: Step = { top: 0, bottom: 5, shares: shares(1, 0, 0, 0), likely: null, confidence: "none", sources: [source("a", 4)] };
+    expect(summary(blocks([lonely])[0])).toEqual({ shares: null, sources: [] });
   });
 });

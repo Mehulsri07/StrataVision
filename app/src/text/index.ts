@@ -41,10 +41,14 @@ export const text = {
   groundFailed: "The ground heights could not be read, so layers cannot be proposed.",
   notEnoughHere: "There are not enough borewells near this spot to say anything.",
   fromBorewells: (n: number, nearest: string) => (n === 1 ? `From 1 borewell, ${nearest} away` : `From ${n} borewells, nearest ${nearest}`),
-  waterExpected: (feet: number, since: string | null) =>
-    `Water level expected about ${feet} ft below ground${since ? ` (from levels measured since ${since})` : ""}`,
-  noWater: "No recent water level nearby",
-  waterAbout: (feet: number) => `Water about ${feet} ft`,
+  noGroundHere: "The ground height is not known at this spot, so layers cannot be proposed here.",
+  waterExpected: (feet: number, nearest: string, since: string) =>
+    `Water level expected about ${feet} ft below ground (nearest reading ${nearest} away; levels measured since ${since})`,
+  noWater: "No recent water level within 1 km",
+  /** On the drawings. An expected level is worked out; a measured one was read off at the borewell. */
+  waterExpectedShort: (feet: number) => `Water expected about ${feet} ft`,
+  waterMeasured: (feet: number, year: string | null) => (year ? `Water ${feet} ft (measured ${year})` : `Water ${feet} ft (date not recorded)`),
+  atThisSpot: (n: number) => `${n} borewells are at this spot:`,
   clickLayer: "Click a layer to see which borewells it comes from.",
   depths: (top: number, bottom: number) => `${top} to ${bottom} ft below ground`,
   blockLabel: (name: string, level: string, top: number, bottom: number) => `${name}, ${level.toLowerCase()}, ${top} to ${bottom} feet`,
@@ -66,8 +70,8 @@ export const text = {
     oddNote: "These are worth a look in StrataField: most often a slip in typing or a pin in the wrong place.",
     borewell: "Borewell",
     matched: "Matched its surroundings",
-    matchedSteps: (right: number, steps: number) => `${right} of ${steps} steps`,
-    usually: (often: string) => `usually ${often} near here`,
+    matchedFeet: (right: number, of: number) => `${right} of ${of} ft`,
+    others: (often: string) => `others like it matched ${often}`,
     fixed: "These are proposals worked out from past drilling. They are not measurements.",
   },
 };

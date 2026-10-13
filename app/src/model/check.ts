@@ -13,10 +13,12 @@ import { METRES_TO_FEET, kmBetween, type ElevationGrid } from "@strata/core";
 import { MIN_BOREWELLS_TO_JUDGE, ODD, SAME_SITE_KM } from "./constants";
 import { groupAt, largest, predictColumn, type Prepared } from "./model";
 
-/** How many steps were compared, and in how many the best guess was right. */
+/** How many steps were compared, in how many the best guess was right, and from how many borewells. */
 export interface Tally {
   steps: number;
   right: number;
+  /** Steps down one borewell are not independent, so a share is only as good as this number. */
+  borewells: number;
 }
 
 export interface OddOne {
@@ -52,7 +54,7 @@ export interface CheckResult {
 /** The share right, or null when nothing was compared. */
 export const share = (t: Tally) => (t.steps === 0 ? null : t.right / t.steps);
 
-const tally = (): Tally => ({ steps: 0, right: 0 });
+const tally = (): Tally => ({ steps: 0, right: 0, borewells: 0 });
 const add = (t: Tally, right: number) => {
   t.steps++;
   t.right += right;
@@ -81,7 +83,7 @@ export function checkModel(prepared: Prepared[], grid: ElevationGrid): CheckResu
     if (!column) continue;
 
     const own: Record<Band, Tally> = { under1: tally(), from1to3: tally(), over3: tally() };
-    let any = false;
+    const touched = new Set<Tally>();
     for (const step of column) {
       const logged = groupAt(p, p.groundFt - (step.top + step.bottom) / 2);
       if (!step.shares || !logged) continue; // nobody else reaches this step, or it logged nothing here
@@ -90,13 +92,14 @@ export function checkModel(prepared: Prepared[], grid: ElevationGrid): CheckResu
       // so the distance is taken step by step, not once for the borewell.
       const km = step.sources[0].km;
       const band: Band = km < 1 ? "under1" : km <= 3 ? "from1to3" : "over3";
-      add(result[step.confidence], right);
-      if (step.confidence !== "none") add(result.overall, right);
-      add(result.byDistance[band], right);
-      add(own[band], right);
-      any = true;
+      const into = [result[step.confidence], result.byDistance[band], own[band], ...(step.confidence === "none" ? [] : [result.overall])];
+      for (const t of into) {
+        add(t, right);
+        touched.add(t);
+      }
     }
-    if (any) each.push({ p, own });
+    for (const t of touched) t.borewells++;
+    if (touched.size > 0) each.push({ p, own });
   }
 
   result.compared = each.length;
@@ -114,7 +117,7 @@ export function checkModel(prepared: Prepared[], grid: ElevationGrid): CheckResu
       const mine = share(own[band])!;
       const before = worst.get(p.id);
       if (mine < ODD.fraction * typical && (!before || mine < before.right / before.steps)) {
-        worst.set(p.id, { id: p.id, borewellId: p.borewellId, ...own[band], typical });
+        worst.set(p.id, { id: p.id, borewellId: p.borewellId, steps: own[band].steps, right: own[band].right, typical });
       }
     }
   }

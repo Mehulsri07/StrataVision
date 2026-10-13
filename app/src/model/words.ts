@@ -2,11 +2,10 @@
  * The model's numbers turned into what a person reads: names, plain phrases, and runs of steps to
  * draw. Kept apart from the screens so the wording can be tested without a browser.
  */
-import { estimateWater, kmBetween, recentCutoff, waterPoints, type Borewell } from "@strata/core";
+import { NEIGHBOURHOOD_KM, estimateWater, kmBetween, recentCutoff, waterPoints, type Borewell } from "@strata/core";
 import { text } from "@/text";
-import { ROUGH } from "./constants";
 import { GROUPS, type Group } from "./groups";
-import type { Step } from "./model";
+import type { Source, Step } from "./model";
 
 export const GROUP_NAME: Record<Group, string> = text.groups;
 
@@ -69,21 +68,42 @@ export function blocks(column: readonly Step[]): Block[] {
   return out;
 }
 
+/**
+ * What a whole stretch says, for its details: the shares averaged over its steps (a block is joined
+ * on its likeliest group alone, so "some sand" in its lower part must not be lost), and every
+ * borewell behind any of its steps, once, nearest first. Where there is not enough data nothing is
+ * proposed and nobody is named.
+ */
+export function summary(block: Block): { shares: Record<Group, number> | null; sources: Source[] } {
+  if (block.level === "none") return { shares: null, sources: [] };
+  const shares: Record<Group, number> = { clay: 0, fineSand: 0, waterBearing: 0, hard: 0 };
+  const sources = new Map<string, Source>();
+  for (const step of block.steps) {
+    for (const g of GROUPS) shares[g] += (step.shares?.[g] ?? 0) / block.steps.length;
+    for (const s of step.sources) if (!sources.has(s.id)) sources.set(s.id, s);
+  }
+  return { shares, sources: [...sources.values()].sort((a, b) => a.km - b.km) };
+}
+
 export interface WaterHere {
   /** Expected depth to water, feet below ground. */
   feet: number;
+  /** How far away the nearest reading used is. */
   nearestKm: number;
-  /** The year from which readings were used, e.g. "2023"; null when every reading counted. */
-  since: string | null;
+  /** The year from which readings were used, e.g. "2023". */
+  since: string;
 }
 
 /**
- * The water level to expect at a spot, from recent readings within reach, or null when there is
- * none near enough to say. Old readings are never mixed with recent ones: the water moves.
+ * The water level to expect at a spot, or null when no reading is good enough to say. Only dated
+ * readings from the last few years count (the water moves, and nobody can say an undated reading is
+ * recent), and only those within the same neighbourhood StrataField's water map uses.
  */
 export function waterHere(latitude: number, longitude: number, borewells: Borewell[]): WaterHere | null {
-  const points = waterPoints(borewells).filter((p) => kmBetween(latitude, longitude, p.latitude, p.longitude) <= ROUGH.nearestKm);
+  const dated = borewells.filter((b) => b.waterLevelOn);
+  const since = recentCutoff(dated).slice(0, 4);
+  const points = waterPoints(dated).filter((p) => kmBetween(latitude, longitude, p.latitude, p.longitude) <= NEIGHBOURHOOD_KM);
   const estimate = estimateWater(latitude, longitude, points);
-  if (!estimate) return null;
-  return { feet: estimate.value, nearestKm: estimate.nearestKm, since: recentCutoff(borewells).slice(0, 4) || null };
+  if (!estimate || !since) return null;
+  return { feet: estimate.value, nearestKm: estimate.nearestKm, since };
 }

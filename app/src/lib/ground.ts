@@ -10,5 +10,7 @@ export function loadGround(): Promise<ElevationGrid> {
     if (!r.ok) throw new Error(`ground heights: ${r.status}`);
     return r.arrayBuffer();
   }).then(parseElevationGrid);
+  // A failed read is not kept, so Refresh can try again.
+  ground.catch(() => (ground = null));
   return ground;
 }
