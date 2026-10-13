@@ -18,8 +18,10 @@ if (!existsSync(exe)) {
 }
 
 const app = spawn(exe, [], {
-  stdio: "ignore",
-  env: { ...process.env, STRATA_DATA_DIR: dataDir, WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: `--remote-debugging-port=${PORT}` },
+  stdio: ["ignore", "ignore", "inherit"], // a crash at start-up should be visible in the log
+  // Development builds open the window's debugging port when asked (see open_main_window in
+  // app/src-tauri/src/lib.rs).
+  env: { ...process.env, STRATA_DATA_DIR: dataDir, STRATA_E2E_DEBUG_PORT: String(PORT) },
 });
 
 /** The text on the app's page, read through the WebView's debugging connection. */
@@ -31,6 +33,7 @@ async function pageText() {
   try {
     return await new Promise((done, fail) => {
       ws.onerror = () => fail(new Error("could not connect to the page"));
+      setTimeout(() => fail(new Error("the page did not answer")), 5000);
       ws.onopen = () => ws.send(JSON.stringify({ id: 1, method: "Runtime.evaluate", params: { expression: "document.body.innerText" } }));
       ws.onmessage = (m) => done(JSON.parse(m.data).result?.result?.value ?? "");
     });

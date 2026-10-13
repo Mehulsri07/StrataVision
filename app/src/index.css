@@ -226,6 +226,11 @@
 .strata-map .leaflet-control-attribution {
     font-size: 10px;
 }
+/* The credit stays readable but is not a link: following it would replace the app's only window
+   with a website, with no way back. */
+.strata-map .leaflet-control-attribution a {
+    pointer-events: none;
+}
 /* Dim the street tiles in dark mode so pins and water colours stay readable. */
 .dark .strata-map .leaflet-tile-pane {
     filter: brightness(0.62) contrast(1.15) saturate(0.7);

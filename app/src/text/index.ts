@@ -8,7 +8,7 @@ export const text = {
   problems: {
     noDatabase: "No borewell records were found on this computer. Install StrataField and add borewells first.",
     newer: "Your records were saved by a newer StrataField than this StrataVision understands. Update StrataVision to open them.",
-    older: "Your records need a one-time upgrade. Open StrataField once, then come back and press Refresh.",
+    older: "Your records need a one-time upgrade. Update StrataField, open it once, then come back and press Refresh.",
     other: "The records could not be read.",
   },
   empty: "There are no borewells yet. Add some in StrataField.",

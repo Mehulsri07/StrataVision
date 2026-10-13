@@ -104,6 +104,7 @@ jobs:
   smoke:
     name: Start-up test (real app, no records)
     runs-on: windows-latest
+    timeout-minutes: 30
     defaults:
       run:
         shell: pwsh

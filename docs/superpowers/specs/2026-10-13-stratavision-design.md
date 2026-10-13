@@ -60,7 +60,9 @@ This replaces the README roadmap line that says StrataVision begins as screens i
 - The Rust side has one job: open `%APPDATA%\Strata\strata.db` **read-only** and return every
   borewell that is not in the Recycle bin, with its layers, pipes and water readings. It honours
   `STRATA_DATA_DIR`, like StrataField.
-- StrataVision never writes to the database and never runs migrations.
+- StrataVision never changes the records and never runs migrations. It never creates the data
+  folder or the database. (SQLite may add its two bookkeeping files, `-wal` and `-shm`, beside an
+  existing database when it is read, as it does for StrataField.)
 - The elevation grid (`lucknow-elevation.bin`) is read from the submodule at build time.
 - Data is reloaded by a **Refresh** button and whenever the window regains focus. StrataField may be
   open at the same time (the database is in WAL mode).

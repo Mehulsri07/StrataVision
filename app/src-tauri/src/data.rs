@@ -1,5 +1,5 @@
-//! Reading StrataField's records. StrataVision only ever reads: it never writes to the database,
-//! never upgrades it and never creates the data folder.
+//! Reading StrataField's records. StrataVision only ever reads: it never changes the records,
+//! never upgrades them and never creates the data folder or the database.
 
 use rusqlite::{Connection, OpenFlags};
 use serde::Serialize;
@@ -56,7 +56,9 @@ pub fn data_dir(roaming_app_data: &Path) -> PathBuf {
 }
 
 /// Every borewell that is not in the Recycle bin, read from `<data_dir>/strata.db` as it is at
-/// this moment. The file is opened read-only and nothing is created, upgraded or changed.
+/// this moment. The file is opened read-only: the records are never upgraded or changed, and the
+/// folder and the file are never created. SQLite may add its two bookkeeping files (`-wal` and
+/// `-shm`) beside an existing database, exactly as StrataField itself does.
 pub fn load(data_dir: &Path) -> Result<Vec<SiteRecord>, LoadError> {
     let path = data_dir.join(DB_FILE_NAME);
     if !path.exists() {
@@ -95,11 +97,21 @@ mod tests {
     use strata_db::schema::{current_version, LATEST_VERSION};
     use strata_db::{repo, Database};
 
-    /// A real database, made the way StrataField makes it, holding borewell BW-1 with one layer.
+    /// A real database, made the way StrataField makes it. BW-1 has a location, one layer, one
+    /// pipe and one water reading; BW-2 has no location and nothing else.
     fn seeded(dir: &Path) -> Database {
         let (db, _) = Database::open(dir).unwrap();
         db.with_tx(|tx| {
             repo::create_with_layers(
+                tx,
+                &BorewellInput {
+                    borewell_id: "BW-2".into(),
+                    ..Default::default()
+                },
+                &[],
+                &[],
+            )?;
+            let b = repo::create_with_layers(
                 tx,
                 &BorewellInput {
                     borewell_id: "BW-1".into(),
@@ -114,11 +126,33 @@ mod tests {
                     material_id: Some("clay".into()),
                     ..Default::default()
                 }],
-                &[],
-            )
+                &[PipeSegment {
+                    start_depth: 10.0,
+                    end_depth: 20.0,
+                    pipe_type: "slotted".into(),
+                    ..Default::default()
+                }],
+            )?;
+            repo::layers::add_water_reading(
+                tx,
+                &b.id,
+                &WaterReading {
+                    measured_on: "2026-01-15".into(),
+                    static_level: Some(35.0),
+                    ..Default::default()
+                },
+            )?;
+            Ok(())
         })
         .unwrap();
         db
+    }
+
+    fn site<'a>(sites: &'a [SiteRecord], borewell_id: &str) -> &'a SiteRecord {
+        sites
+            .iter()
+            .find(|s| s.borewell.borewell_id == borewell_id)
+            .unwrap()
     }
 
     fn set_version(dir: &Path, version: i64) {
@@ -162,17 +196,37 @@ mod tests {
     fn loads_after_a_clean_close() {
         let tmp = tempfile::tempdir().unwrap();
         drop(seeded(tmp.path()));
+        // The state this test is about: StrataField closed and took its bookkeeping files with it.
+        let db_file = tmp.path().join(DB_FILE_NAME);
+        assert!(!tmp.path().join("strata.db-wal").exists());
+        assert!(!tmp.path().join("strata.db-shm").exists());
+        let before = std::fs::read(&db_file).unwrap();
+
         let got = load(tmp.path()).unwrap();
-        assert_eq!(got.len(), 1);
-        assert_eq!(got[0].borewell.borewell_id, "BW-1");
-        assert_eq!(got[0].strata.len(), 1);
+        assert_eq!(got.len(), 2);
+        let full = site(&got, "BW-1");
+        assert_eq!(full.strata.len(), 1);
+        assert_eq!(full.pipes.len(), 1);
+        assert_eq!(full.pipes[0].pipe_type, "slotted");
+        assert_eq!(full.water_readings.len(), 1);
+        assert_eq!(full.water_readings[0].static_level, Some(35.0));
+        // A borewell with no location is still loaded; the map simply cannot show it.
+        let bare = site(&got, "BW-2");
+        assert_eq!(bare.borewell.latitude, None);
+        assert!(bare.strata.is_empty() && bare.pipes.is_empty() && bare.water_readings.is_empty());
+
+        assert_eq!(
+            std::fs::read(&db_file).unwrap(),
+            before,
+            "the records were changed"
+        );
     }
 
     #[test]
     fn loads_while_another_app_has_it_open() {
         let tmp = tempfile::tempdir().unwrap();
         let _open = seeded(tmp.path());
-        assert_eq!(load(tmp.path()).unwrap().len(), 1);
+        assert_eq!(load(tmp.path()).unwrap().len(), 2);
     }
 
     #[test]
@@ -180,15 +234,18 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let db = seeded(tmp.path());
         db.with_tx(|tx| {
-            let id = repo::borewells::search(tx, &Default::default())?[0]
-                .borewell
-                .id
-                .clone();
-            repo::borewells::soft_delete(tx, &id)
+            let all = repo::borewells::search(tx, &Default::default())?;
+            let bw1 = all
+                .iter()
+                .find(|i| i.borewell.borewell_id == "BW-1")
+                .unwrap();
+            repo::borewells::soft_delete(tx, &bw1.borewell.id)
         })
         .unwrap();
         drop(db);
-        assert_eq!(load(tmp.path()).unwrap().len(), 0);
+        let got = load(tmp.path()).unwrap();
+        assert_eq!(got.len(), 1);
+        assert_eq!(got[0].borewell.borewell_id, "BW-2");
     }
 
     #[test]
@@ -221,6 +278,10 @@ mod tests {
     #[ignore]
     fn seed_for_manual_runs() {
         let dir = PathBuf::from(std::env::var_os("STRATA_SEED_DIR").expect("set STRATA_SEED_DIR"));
+        assert!(
+            !dir.join(DB_FILE_NAME).exists(),
+            "refusing to add made-up borewells to records that already exist"
+        );
         let (db, _) = Database::open(&dir).unwrap();
         db.with_tx(|tx| {
             // A 5 by 5 grid across Lucknow (the middle one is at the city centre), plus two
