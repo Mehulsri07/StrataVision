@@ -213,4 +213,36 @@ mod tests {
             PathBuf::from("C:/Users/x/AppData/Roaming").join("Strata")
         );
     }
+
+    /// Not a test: writes a made-up set of borewells for trying the app by hand.
+    /// `STRATA_SEED_DIR=<empty folder> cargo test -p stratavision seed_for_manual_runs -- --ignored`,
+    /// then start the app with `STRATA_DATA_DIR` set to the same folder.
+    #[test]
+    #[ignore]
+    fn seed_for_manual_runs() {
+        let dir = PathBuf::from(std::env::var_os("STRATA_SEED_DIR").expect("set STRATA_SEED_DIR"));
+        let (db, _) = Database::open(&dir).unwrap();
+        db.with_tx(|tx| {
+            // A 5 by 5 grid across Lucknow (the middle one is at the city centre), plus two
+            // borewells whose location was never recorded.
+            for i in 0..27 {
+                let located = i < 25;
+                repo::create_with_layers(
+                    tx,
+                    &BorewellInput {
+                        borewell_id: format!("BW-{:03}", i + 1),
+                        area: "Made-up area".into(),
+                        latitude: located.then_some(26.75 + 0.05 * (i / 5) as f64),
+                        longitude: located.then_some(80.85 + 0.05 * (i % 5) as f64),
+                        total_depth: Some(200.0 + 10.0 * i as f64),
+                        ..Default::default()
+                    },
+                    &[],
+                    &[],
+                )?;
+            }
+            Ok(())
+        })
+        .unwrap();
+    }
 }
