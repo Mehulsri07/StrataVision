@@ -37,7 +37,10 @@ export function useModel(records: Records | null): Model | "failed" | null {
     return () => clearTimeout(later);
   }, [prepared, grid]);
 
-  if (grid === "failed") return "failed";
-  if (!grid || !prepared) return null;
-  return { grid, prepared, check: checked?.of === prepared ? checked.result : null };
+  // The same object until something in it changes, so screens can tell when to work things out again.
+  return useMemo(() => {
+    if (grid === "failed") return "failed";
+    if (!grid || !prepared) return null;
+    return { grid, prepared, check: checked?.of === prepared ? checked.result : null };
+  }, [grid, prepared, checked]);
 }
