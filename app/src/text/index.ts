@@ -16,6 +16,9 @@ export const text = {
   onMap: (n: number) => (n === 1 ? "1 borewell on the map" : `${n} borewells on the map`),
   notShown: (m: number) => (m === 1 ? "1 without a location is not shown" : `${m} without a location are not shown`),
 
+  /** The four kinds of ground the proposals are made in. */
+  groups: { clay: "Clay", fineSand: "Fine sand", waterBearing: "Water-bearing sand", hard: "Hard ground" },
+
   selectHint: "Click a borewell on the map to see it here.",
   area: "Area",
   depth: "Depth",
