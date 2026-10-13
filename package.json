@@ -1,0 +1,29 @@
+{
+  "name": "stratavision",
+  "private": true,
+  "description": "A proposed picture of the ground under Lucknow, built from StrataField's borewell records",
+  "author": {
+    "name": "Mehul",
+    "email": "meulsri.0701@gmail.com"
+  },
+  "license": "MIT",
+  "type": "module",
+  "workspaces": [
+    "strata/core",
+    "app"
+  ],
+  "scripts": {
+    "dev": "npm run tauri -w app -- dev",
+    "build": "npm run tauri -w app -- build",
+    "typecheck": "npm run typecheck -w app",
+    "lint": "eslint app e2e",
+    "smoke": "node e2e/smoke.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.0",
+    "eslint": "^10.11.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.12.0",
+    "typescript-eslint": "^8.71.0"
+  }
+}

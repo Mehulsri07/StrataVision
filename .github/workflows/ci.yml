@@ -1,0 +1,135 @@
+name: CI
+
+# Checks on every pull request. Changes to documentation alone skip CI.
+# StrataField's shared code comes in as the `strata` submodule, so every checkout fetches it.
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['**.md', 'docs/**']
+  pull_request:
+    paths-ignore: ['**.md', 'docs/**']
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Typecheck, lint, frontend build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build frontend
+        run: npm run build -w app
+
+  audit:
+    name: Known vulnerabilities in libraries
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      # Libraries that go into the app (not build tools); fails on high or critical advisories.
+      - name: npm audit
+        run: npm audit --omit=dev --audit-level=high
+
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-audit
+
+      - name: cargo audit
+        run: cargo audit
+
+  rust:
+    name: Rust format, lint, tests
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: . -> target
+          # One cache shared by all branches, refreshed from main.
+          shared-key: rust-checks
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+
+      # tauri::generate_context! needs the frontend folder to exist. The real frontend is built and
+      # checked in the other job, so a placeholder page is enough here (saves installing Node).
+      - name: Placeholder frontend
+        run: |
+          New-Item -ItemType Directory -Force app/dist | Out-Null
+          Set-Content app/dist/index.html '<!doctype html><title>StrataVision</title>'
+
+      - name: Rust format
+        run: cargo fmt --all --check
+
+      - name: Rust lint
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Rust tests (reading StrataField's records without changing them)
+        run: cargo test --workspace
+
+  smoke:
+    name: Start-up test (real app, no records)
+    runs-on: windows-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          submodules: true
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: . -> target
+          shared-key: rust-smoke
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+
+      - run: npm ci
+
+      - name: Build the app (debug, no installer)
+        run: npm run tauri -w app -- build --debug --no-bundle
+
+      - name: Start-up test
+        run: npm run smoke
