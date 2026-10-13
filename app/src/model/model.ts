@@ -89,6 +89,9 @@ export function groupAt(p: Prepared, heightFt: number): Group | null {
   return null;
 }
 
+/** The group with the largest share; a tie goes to the earlier group. */
+export const largest = (shares: Record<Group, number>) => GROUPS.reduce((a, b) => (shares[b] > shares[a] ? b : a));
+
 /**
  * The ground at a point, in steps from the surface down to the deepest that any borewell within
  * reach goes. Returns null when the ground height at the point is unknown, and an empty column when
@@ -104,59 +107,84 @@ export function predictColumn(
 
   // Positions in km east and north of the point: flat-earth, accurate to well under 1% across a city.
   const kx = 111.32 * Math.cos((latitude * Math.PI) / 180);
-  const near: { p: Prepared; x: number; y: number; km: number }[] = [];
+  const near: Near[] = [];
   for (const p of prepared) {
     if (p.id === options.exclude) continue;
     const x = (p.longitude - longitude) * kx, y = (p.latitude - latitude) * 110.57, km = Math.hypot(x, y);
-    if (km <= RADIUS_KM) near.push({ p, x, y, km });
+    if (km <= RADIUS_KM) near.push({ p, x, y, km, run: 0 });
   }
   near.sort((a, b) => a.km - b.km);
 
   const deepestFt = Math.max(0, ...near.map((c) => groundFt - c.p.bottomFt));
   const column: Step[] = [];
+  let who: Near[] = [], said: Group[] = [], seats: Seats | null = null, counted: Counted | null = null;
   for (let top = 0; top < deepestFt; top += STEP_FT) {
     const middle = groundFt - (top + STEP_FT / 2);
     // ponytail: the 12 nearest borewells, not sites; a spot with 12 or more logs crowds out everyone else. Limit by site if real records show it.
-    const voters: { c: (typeof near)[number]; group: Group }[] = [];
+    const nowWho: Near[] = [], nowSaid: Group[] = [];
+    // Going down, each borewell is followed through its own layers (`run`), and dropped for good
+    // once the step is below its bottom. This is `groupAt` without starting from the top each time.
+    let kept = 0;
     for (const c of near) {
-      const group = groupAt(c.p, middle);
-      if (group && voters.push({ c, group }) === MAX_VOTERS) break;
+      const runs = c.p.runs;
+      while (c.run < runs.length && runs[c.run].bottomFt >= middle) c.run++;
+      if (c.run === runs.length) continue;
+      near[kept++] = c;
+      if (nowWho.length < MAX_VOTERS && runs[c.run].topFt >= middle) {
+        nowWho.push(c);
+        nowSaid.push(runs[c.run].group);
+      }
     }
-    column.push({ top, bottom: top + STEP_FT, ...vote(voters) });
+    near.length = kept;
+    // From one step down to the next the same borewells usually vote, and often the same way, so
+    // the work is shared: steps of one column may hold the same `shares` and `sources`.
+    const sameWho = seats !== null && nowWho.length === who.length && nowWho.every((c, i) => c === who[i]);
+    if (!seats || !sameWho) seats = seat(nowWho);
+    if (!counted || !sameWho || nowSaid.some((g, i) => g !== said[i])) counted = count(seats, nowSaid);
+    who = nowWho;
+    said = nowSaid;
+    column.push({ top, bottom: top + STEP_FT, ...counted });
   }
   return column;
 }
 
-/** The group with the largest share; a tie goes to the earlier group. */
-export const largest = (shares: Record<Group, number>) => GROUPS.reduce((a, b) => (shares[b] > shares[a] ? b : a));
+/** A borewell within reach of the asked point: `x`, `y` and `km` are from that point; `run` is the layer it has got down to. */
+type Near = { p: Prepared; x: number; y: number; km: number; run: number };
 
-const apart = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y);
+/** Who votes on a step and how much each counts, before anyone says what they logged. */
+type Seats = { sources: Source[]; total: number; sites: number; nearestKm: number };
+type Counted = Pick<Step, "shares" | "likely" | "confidence" | "sources">;
 
-function vote(voters: { c: { p: Prepared; x: number; y: number; km: number }; group: Group }[]): Pick<Step, "shares" | "likely" | "confidence" | "sources"> {
-  if (voters.length === 0) return { shares: null, likely: null, confidence: "none", sources: [] };
+const beside = (a: Near, b: Near) => (a.x - b.x) ** 2 + (a.y - b.y) ** 2 <= SAME_SITE_KM ** 2;
 
-  const shares: Record<Group, number> = { clay: 0, fineSand: 0, waterBearing: 0, hard: 0 };
+function seat(voters: Near[]): Seats {
   const sources: Source[] = [];
   let total = 0;
-  for (const { c, group } of voters) {
+  for (const c of voters) {
     // Crowded sites don't shout: borewells close together share their vote.
-    const crowd = voters.filter((other) => apart(other.c, c) <= SAME_SITE_KM).length;
+    let crowd = 0;
+    for (const other of voters) if (beside(other, c)) crowd++;
     const weight = c.p.weight / Math.max(c.km, MIN_DISTANCE_KM) ** 2 / crowd;
-    shares[group] += weight;
     total += weight;
     sources.push({ id: c.p.id, borewellId: c.p.borewellId, km: c.km, weight });
   }
-  for (const g of GROUPS) shares[g] /= total;
-
   // Separate sites, nearest first: a voter starts a new one unless it is beside an earlier site.
-  const sites: (typeof voters)[number]["c"][] = [];
-  for (const { c } of voters) if (!sites.some((s) => apart(s, c) <= SAME_SITE_KM)) sites.push(c);
+  const sites: Near[] = [];
+  for (const c of voters) if (!sites.some((s) => beside(s, c))) sites.push(c);
+  return { sources, total, sites: sites.length, nearestKm: voters[0]?.km ?? Infinity };
+}
+
+function count({ sources, total, sites, nearestKm }: Seats, said: Group[]): Counted {
+  if (sources.length === 0) return { shares: null, likely: null, confidence: "none", sources };
+
+  const shares: Record<Group, number> = { clay: 0, fineSand: 0, waterBearing: 0, hard: 0 };
+  for (let i = 0; i < said.length; i++) shares[said[i]] += sources[i].weight;
+  for (const g of GROUPS) shares[g] /= total; // divided once at the end, so a unanimous vote is exactly 1
 
   const best = largest(shares);
-  const nearestKm = voters[0].c.km;
   const confidence: Confidence =
-    nearestKm <= LIKELY.nearestKm && sites.length >= LIKELY.sites && shares[best] >= LIKELY.share ? "likely"
-    : nearestKm <= ROUGH.nearestKm && sites.length >= ROUGH.sites ? "rough"
+    nearestKm <= LIKELY.nearestKm && sites >= LIKELY.sites && shares[best] >= LIKELY.share ? "likely"
+    : nearestKm <= ROUGH.nearestKm && sites >= ROUGH.sites ? "rough"
     : "none";
   return { shares, likely: confidence === "none" ? null : best, confidence, sources };
 }
