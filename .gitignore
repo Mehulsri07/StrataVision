@@ -1,0 +1,34 @@
+# Dependencies and build output
+node_modules/
+dist/
+*.tsbuildinfo
+*.log
+/target/
+app/src-tauri/gen/schemas
+
+# Secrets and editor files
+.env
+*.local
+.vscode/*
+!.vscode/extensions.json
+.DS_Store
+
+# Private sample data (real client files) - never commit
+private-fixtures/
+
+# AI assistant instructions and tools are kept private (not committed). Everything else in
+# .github/ (workflows, scripts, release notes, Dependabot) is part of the project and is committed.
+.kiro/
+.claude/
+.agents/
+skills-lock.json
+AGENTS.md
+CLAUDE.md
+.github/copilot-instructions.md
+.github/instructions/
+.github/prompts/
+.github/chatmodes/
+.github/agents/
+
+# Scratch space for plan execution
+.superpowers/
