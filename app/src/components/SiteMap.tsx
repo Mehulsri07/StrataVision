@@ -12,23 +12,25 @@ export const located = (sites: SiteRecord[]) => sites.filter((s) => s.borewell.l
 
 /**
  * The borewells on OpenStreetMap's online tiles. Without internet the tiles are a plain background
- * and the pins still show.
+ * and the pins still show. Clicking a pin selects that borewell; clicking anywhere else picks the spot.
  */
-export function SiteMap({ sites, selectedId, onSelect }: {
+export function SiteMap({ sites, selectedId, picked, onSelect, onPick }: {
   sites: SiteRecord[];
   selectedId: string | null;
-  onSelect: (id: string | null) => void;
+  picked: [number, number] | null;
+  onSelect: (id: string) => void;
+  onPick: (latitude: number, longitude: number) => void;
 }) {
   const pins = useMemo(() => located(sites), [sites]);
   return (
-    <MapContainer center={CITY_CENTRE} zoom={12} preferCanvas className="strata-map z-0 h-full w-full bg-map-land">
+    <MapContainer center={CITY_CENTRE} zoom={12} preferCanvas className="strata-map z-0 h-full w-full cursor-crosshair bg-map-land">
       <TileLayer
         url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         maxZoom={19}
       />
       <FitOnce pins={pins} />
-      <ClearOnMapClick onClear={() => onSelect(null)} />
+      <PickOnMapClick onPick={onPick} />
       {/* ponytail: no grouping, so borewells at exactly the same spot sit on top of each other and
           only the top one can be clicked. Group them (as StrataField does) if that gets in the way. */}
       {pins.map(({ borewell: b }) => {
@@ -46,6 +48,8 @@ export function SiteMap({ sites, selectedId, onSelect }: {
           </CircleMarker>
         );
       })}
+      {/* The picked spot: an open, dashed ring, so it cannot be taken for a borewell. */}
+      {picked && <CircleMarker center={picked} radius={11} interactive={false} pathOptions={{ color: "#16202a", weight: 2, dashArray: "4 4", fill: false }} />}
     </MapContainer>
   );
 }
@@ -63,7 +67,7 @@ function FitOnce({ pins }: { pins: SiteRecord[] }) {
   return null;
 }
 
-function ClearOnMapClick({ onClear }: { onClear: () => void }) {
-  useMapEvents({ click: onClear });
+function PickOnMapClick({ onPick }: { onPick: (latitude: number, longitude: number) => void }) {
+  useMapEvents({ click: (e) => onPick(e.latlng.lat, e.latlng.lng) });
   return null;
 }
