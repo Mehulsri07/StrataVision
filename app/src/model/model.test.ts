@@ -65,13 +65,19 @@ describe("predictColumn", () => {
     expect(step).toMatchObject({ confidence: "none", likely: null });
   });
 
-  it("ponytail limit: more than 12 borewells at the nearest spot leave room for nobody else", () => {
-    // Today's behaviour, written down so that changing it is a decision: the voters are the 12
-    // nearest borewells, not sites.
+  it("a busy spot takes at most three of the twelve seats", () => {
     const step = stepAt(column([...crowd(13, 0.2, CLAY), site("other", north(0), east(-0.5), SAND)]), 20);
-    expect(step.sources).toHaveLength(12);
-    expect(step.shares?.waterBearing).toBe(0);
-    expect(step.confidence).toBe("none");
+    expect(step.sources.map((s) => s.id)).toEqual(["c0", "c1", "c2", "other"]);
+    expect(step.shares!.waterBearing).toBeGreaterThan(0.1);
+    expect(step.confidence).toBe("rough");
+  });
+
+  it("a busy spot does not hide the sites around it", () => {
+    // Twelve clay logs at one spot, nearer than six separate sites that all found sand.
+    const ring = Array.from({ length: 6 }, (_, i) => site(`r${i}`, north(0.4 * Math.cos(i)), east(0.4 * Math.sin(i)), SAND));
+    const step = stepAt(column([...crowd(12, 0.3, CLAY), ...ring]), 20);
+    expect(step).toMatchObject({ likely: "waterBearing", confidence: "likely" });
+    expect(step.sources).toHaveLength(9);
   });
 
   it("matches layers by height, not depth, on sloping ground", () => {
@@ -126,10 +132,10 @@ describe("predictColumn", () => {
     expect(against({ locationSource: "address" })).toBeCloseTo(1 / 1.5, 3);
   });
 
-  it("converts borewells logged in metres", () => {
-    const col = column([site("metric", north(0), east(0.5), [[0, 10, "clay"]], { depthUnit: "m" })]);
-    expect(col).toHaveLength(7); // 10 m is 32.8 ft
-    expect(stepAt(col, 27).shares?.clay).toBe(1);
+  it("reads layer depths as feet whatever the borewell's unit says", () => {
+    // StrataField keeps every layer in feet; the unit on an old record only labels its total depth.
+    const col = column([site("old", north(0), east(0.5), [[0, 10, "clay"]], { depthUnit: "m" })]);
+    expect(col).toHaveLength(2);
   });
 
   it("not recorded and gaps never vote", () => {
@@ -156,7 +162,7 @@ describe("predictColumn", () => {
   it("exclude hides a borewell from its own prediction", () => {
     const prepared = prepare([site("here", CENTRE[0], CENTRE[1], CLAY)], DEFAULT_MATERIALS, flat);
     expect(predictColumn(CENTRE[0], CENTRE[1], prepared, flat)).toHaveLength(40);
-    expect(predictColumn(CENTRE[0], CENTRE[1], prepared, flat, { exclude: "here" })).toEqual([]);
+    expect(predictColumn(CENTRE[0], CENTRE[1], prepared, flat, { exclude: new Set(["here"]) })).toEqual([]);
   });
 
   it("groundM stands in for the grid at the asked point", () => {

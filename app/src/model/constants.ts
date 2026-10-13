@@ -14,6 +14,9 @@ export const RADIUS_KM = 5;
 /** At most this many borewells vote on a step: the nearest ones that reach it. */
 export const MAX_VOTERS = 12;
 
+/** At most this many of those come from one spot (borewells within `SAME_SITE_KM` of each other). */
+export const MAX_PER_SITE = 3;
+
 /** A borewell closer than this counts as this far away, so one at the very spot is not infinitely loud. */
 export const MIN_DISTANCE_KM = 0.025;
 
@@ -37,6 +40,7 @@ export const MIN_BOREWELLS_TO_JUDGE = 10;
 
 /**
  * A borewell is an odd one out when it matches its surroundings less than this fraction as often as
- * is typical for borewells with neighbours as near, judged on at least this many steps.
+ * is typical at that distance from the nearest other site, judged on at least this many steps and
+ * against at least this many borewells.
  */
-export const ODD = { fraction: 0.5, minSteps: 10 };
+export const ODD = { fraction: 0.5, minSteps: 10, minBorewells: 5 };

@@ -11,8 +11,10 @@ const SOIL: Record<Group, string> = { clay: "clay", waterBearing: "medium_sand",
 
 /**
  * Going down: clay, water-bearing sand, fine sand, hard ground, then water-bearing sand again.
- * Each boundary sits at `base` feet above sea level and rises and falls by 15 ft across the city
- * as a smooth wave 8 km long, each running in its own direction.
+ * Each boundary sits at `base` feet above sea level and rises and falls by 40 ft across the city
+ * as a smooth wave 8 km long, each running in its own direction. The waves are taller than the
+ * layers are thick, so layers thin out and vanish in places, as sand lenses do: knowing the height
+ * alone is not enough to guess the ground, the place matters.
  */
 const BOUNDARIES = [
   { base: 330, direction: 0.3, shift: 0 },
@@ -29,7 +31,7 @@ export function truth(latitude: number, longitude: number, heightFt: number): Gr
   for (let i = 0; i < BOUNDARIES.length; i++) {
     const { base, direction, shift } = BOUNDARIES[i];
     const wave = Math.sin((2 * Math.PI * (x * Math.cos(direction) + y * Math.sin(direction))) / 8 + shift);
-    ceiling = Math.min(ceiling, base + 15 * wave); // a boundary never rises above the one over it
+    ceiling = Math.min(ceiling, base + 40 * wave); // a boundary never rises above the one over it
     if (heightFt > ceiling) return BELOW[i];
   }
   return BELOW[BOUNDARIES.length];
@@ -48,11 +50,15 @@ function random(seed: number) {
 /**
  * `count` borewells logged from `truth`: 70% spread over the city, 30% within 50 m of an earlier
  * one, each 150 to 400 ft deep. Always the same for the same seed.
+ *
+ * With `wrongEvery`, every so-many-th borewell is logged upside down (as if the log had been typed
+ * in from the bottom); their ids are returned as `planted`.
  */
-export function madeUpCity(count: number, seed = 1): { sites: ModelSite[]; grid: ElevationGrid } {
+export function madeUpCity(count: number, seed = 1, wrongEvery = 0): { sites: ModelSite[]; grid: ElevationGrid; planted: string[] } {
   const grid = slopeGrid(110, 125);
   const next = random(seed);
   const sites: ModelSite[] = [];
+  const planted: string[] = [];
   for (let i = 0; i < count; i++) {
     let latitude: number, longitude: number;
     if (i > 0 && next() < 0.3) {
@@ -72,7 +78,14 @@ export function madeUpCity(count: number, seed = 1): { sites: ModelSite[]; grid:
       if (last && last[2] === soil) last[1] = top + 5;
       else layers.push([top, top + 5, soil]);
     }
-    sites.push(site(`m${i}`, latitude, longitude, layers));
+    if (wrongEvery && i % wrongEvery === wrongEvery - 1) {
+      planted.push(`m${i}`);
+      let top = 0;
+      const upsideDown = layers.reverse().map(([from, to, soil]): [number, number, string] => [top, (top += to - from), soil]);
+      sites.push(site(`m${i}`, latitude, longitude, upsideDown));
+    } else {
+      sites.push(site(`m${i}`, latitude, longitude, layers));
+    }
   }
-  return { sites, grid };
+  return { sites, grid, planted };
 }

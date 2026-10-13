@@ -6,7 +6,8 @@ import { describe, expect, it } from "vitest";
 import { DEFAULT_MATERIALS, METRES_TO_FEET, heightAt } from "@strata/core";
 import { checkModel, share } from "./check";
 import { madeUpCity, truth } from "./madeUpCity";
-import { predictColumn, prepare } from "./model";
+import { GROUPS, type Group } from "./groups";
+import { predictColumn, prepare, type Prepared } from "./model";
 
 const city = (count: number) => {
   const { sites, grid } = madeUpCity(count);
@@ -14,6 +15,26 @@ const city = (count: number) => {
 };
 const { grid, prepared } = city(500);
 const result = checkModel(prepared, grid);
+
+/**
+ * How often you would be right knowing only the height above sea level and nothing about the
+ * place: at each height, guess whatever is commonest there across the whole city.
+ */
+function guessingByHeightAlone(all: Prepared[]) {
+  const steps: { band: number; group: Group }[] = [];
+  for (const p of all) for (const run of p.runs) for (let h = run.topFt - 2.5; h > run.bottomFt; h -= 5) steps.push({ band: Math.floor(h / 5), group: run.group });
+  const seen = new Map<number, Record<Group, number>>();
+  for (const { band, group } of steps) {
+    const counts = seen.get(band) ?? { clay: 0, fineSand: 0, waterBearing: 0, hard: 0 };
+    counts[group]++;
+    seen.set(band, counts);
+  }
+  const commonest = (band: number) => GROUPS.reduce((a, b) => (seen.get(band)![b] > seen.get(band)![a] ? b : a));
+  return steps.filter((s) => commonest(s.band) === s.group).length / steps.length;
+}
+
+/** GitHub's shared runners can be a few times slower than a desk computer. */
+const SLOW = (globalThis as { process?: { env: Record<string, string | undefined> } }).process?.env.CI ? 3 : 1;
 
 /** Milliseconds taken by `work`. */
 const timed = (work: () => void) => {
@@ -25,8 +46,26 @@ const timed = (work: () => void) => {
 describe("a made-up city of 500 borewells", () => {
   it("has many borewells at the same spots, like the real records", () => {
     expect(prepared).toHaveLength(500);
-    expect(result.compared).toBe(500);
+    const sharing = prepared.filter((p) => prepared.some((q) => q !== p && Math.hypot((p.latitude - q.latitude) * 110.57, (p.longitude - q.longitude) * 99.3) <= 0.1));
+    expect(sharing.length).toBeGreaterThan(150);
     expect(result.canJudge).toBe(true);
+  });
+
+  it("is ground where the place matters, and the model uses the place", () => {
+    const blind = guessingByHeightAlone(prepared);
+    console.log("made-up city, right by height alone:", blind);
+    expect(blind).toBeLessThan(0.75);
+    expect(share(result.overall)!).toBeGreaterThan(blind + 0.15);
+  });
+
+  it("finds logs typed in upside down, and few honest ones", () => {
+    const { sites, grid: g, planted } = madeUpCity(500, 1, 10);
+    const odd = checkModel(prepare(sites, DEFAULT_MATERIALS, g), g).oddOnesOut.map((o) => o.id);
+    const found = planted.filter((id) => odd.includes(id));
+    console.log("made-up city, upside-down logs found:", found.length, "of", planted.length, "honest flagged:", odd.length - found.length);
+    expect(planted).toHaveLength(50);
+    expect(found.length).toBeGreaterThanOrEqual(35); // most of them
+    expect(odd.length - found.length).toBeLessThanOrEqual(10);
   });
 
   it("is right at least 7 times in 10 where it says likely", () => {
@@ -69,9 +108,9 @@ describe("a made-up city of 500 borewells", () => {
       check: timed(() => checkModel(prepared, grid)),
     };
     console.log("made-up city, milliseconds:", times);
-    expect(times.column).toBeLessThan(20);
-    expect(times.section).toBeLessThan(1000);
-    expect(times.map).toBeLessThan(5000);
-    expect(times.check).toBeLessThan(5000);
+    expect(times.column).toBeLessThan(20 * SLOW);
+    expect(times.section).toBeLessThan(1000 * SLOW);
+    expect(times.map).toBeLessThan(5000 * SLOW);
+    expect(times.check).toBeLessThan(5000 * SLOW);
   });
 });

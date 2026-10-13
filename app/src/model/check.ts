@@ -3,11 +3,14 @@
  * the model's best guess matched what was really logged. This is the number that should go up as
  * borewells are added, and it shows whether "likely" really means likely on the real records.
  *
+ * Everything at the hidden borewell's spot is hidden with it. The records have many borewells side
+ * by side, and two logs of the same spot agreeing says nothing about a place nobody drilled.
+ *
  * It also finds the odd ones out: borewells that disagree with their surroundings far more than is
  * usual, which are most often a slip in typing or a pin in the wrong place.
  */
 import { METRES_TO_FEET, kmBetween, type ElevationGrid } from "@strata/core";
-import { MIN_BOREWELLS_TO_JUDGE, ODD } from "./constants";
+import { MIN_BOREWELLS_TO_JUDGE, ODD, SAME_SITE_KM } from "./constants";
 import { groupAt, largest, predictColumn, type Prepared } from "./model";
 
 /** How many steps were compared, and in how many the best guess was right. */
@@ -19,25 +22,28 @@ export interface Tally {
 export interface OddOne {
   id: string;
   borewellId: string;
+  /** Its own score where it fits worst: steps compared, and how many matched. */
   steps: number;
   right: number;
-  /** The usual share right for borewells with neighbours as near as this one's. */
+  /** The usual share right for borewells judged from as far away. */
   typical: number;
 }
 
 type Band = "under1" | "from1to3" | "over3";
+const BANDS: Band[] = ["under1", "from1to3", "over3"];
 
 export interface CheckResult {
   /** False with too few borewells to compare; the numbers are then not worth showing. */
   canJudge: boolean;
   /** Borewells for which at least one step could be compared. */
   compared: number;
+  /** Steps the model would show as an estimate: likely and rough together. */
   overall: Tally;
-  /** By how sure the model said it was. "none" steps are guesses it would not show as estimates. */
   likely: Tally;
   rough: Tally;
+  /** Best guesses the model would not show ("not enough data"), scored all the same. */
   none: Tally;
-  /** By how far each borewell is from its nearest neighbour, in km. */
+  /** Every scored step, by how far away the nearest borewell behind that step was, in km. */
   byDistance: Record<Band, Tally>;
   /** Worst first. */
   oddOnesOut: OddOne[];
@@ -47,6 +53,10 @@ export interface CheckResult {
 export const share = (t: Tally) => (t.steps === 0 ? null : t.right / t.steps);
 
 const tally = (): Tally => ({ steps: 0, right: 0 });
+const add = (t: Tally, right: number) => {
+  t.steps++;
+  t.right += right;
+};
 
 /** The middle value. (core's `median` rounds to one decimal, which is too coarse for shares.) */
 function middle(values: number[]): number | null {
@@ -60,42 +70,54 @@ export function checkModel(prepared: Prepared[], grid: ElevationGrid): CheckResu
     canJudge: false, compared: 0, overall: tally(), likely: tally(), rough: tally(), none: tally(),
     byDistance: { under1: tally(), from1to3: tally(), over3: tally() }, oddOnesOut: [],
   };
-  const each: { p: Prepared; band: Band; own: Tally }[] = [];
+  /** Each compared borewell's own score, by how far away it was judged from. */
+  const each: { p: Prepared; own: Record<Band, Tally> }[] = [];
 
   for (const p of prepared) {
-    // Predicted standing where it stands: same place, same ground height, itself left out.
-    const column = predictColumn(p.latitude, p.longitude, prepared, grid, { exclude: p.id, groundM: p.groundFt / METRES_TO_FEET });
+    const spot = new Set<string>();
+    for (const q of prepared) if (kmBetween(p.latitude, p.longitude, q.latitude, q.longitude) <= SAME_SITE_KM) spot.add(q.id);
+    // Predicted standing where it stands: same place, same ground height, its own spot left out.
+    const column = predictColumn(p.latitude, p.longitude, prepared, grid, { exclude: spot, groundM: p.groundFt / METRES_TO_FEET });
     if (!column) continue;
-    let nearestKm = Infinity;
-    for (const q of prepared) if (q !== p) nearestKm = Math.min(nearestKm, kmBetween(p.latitude, p.longitude, q.latitude, q.longitude));
-    const band: Band = nearestKm < 1 ? "under1" : nearestKm <= 3 ? "from1to3" : "over3";
 
-    const own = tally();
+    const own: Record<Band, Tally> = { under1: tally(), from1to3: tally(), over3: tally() };
+    let any = false;
     for (const step of column) {
       const logged = groupAt(p, p.groundFt - (step.top + step.bottom) / 2);
       if (!step.shares || !logged) continue; // nobody else reaches this step, or it logged nothing here
       const right = largest(step.shares) === logged ? 1 : 0;
-      for (const t of [own, result.overall, result[step.confidence], result.byDistance[band]]) {
-        t.steps++;
-        t.right += right;
-      }
+      // A deep borewell beside a shallow one is judged from far away below the shallow one's bottom,
+      // so the distance is taken step by step, not once for the borewell.
+      const km = step.sources[0].km;
+      const band: Band = km < 1 ? "under1" : km <= 3 ? "from1to3" : "over3";
+      add(result[step.confidence], right);
+      if (step.confidence !== "none") add(result.overall, right);
+      add(result.byDistance[band], right);
+      add(own[band], right);
+      any = true;
     }
-    if (own.steps > 0) each.push({ p, band, own });
+    if (any) each.push({ p, own });
   }
 
   result.compared = each.length;
   result.canJudge = each.length >= MIN_BOREWELLS_TO_JUDGE;
   if (!result.canJudge) return result;
 
-  const judged = each.filter((e) => e.own.steps >= ODD.minSteps);
-  for (const band of ["under1", "from1to3", "over3"] as const) {
-    const inBand = judged.filter((e) => e.band === band);
-    const typical = middle(inBand.map((e) => e.own.right / e.own.steps));
-    if (typical == null) continue;
-    for (const { p, own } of inBand) {
-      if (own.right / own.steps < ODD.fraction * typical) result.oddOnesOut.push({ id: p.id, borewellId: p.borewellId, ...own, typical });
+  // A borewell is odd where it matches less than half as often as is usual at that distance. It is
+  // listed once, with its score where it fits worst.
+  const worst = new Map<string, OddOne>();
+  for (const band of BANDS) {
+    const judged = each.filter((e) => e.own[band].steps >= ODD.minSteps);
+    if (judged.length < ODD.minBorewells) continue;
+    const typical = middle(judged.map((e) => share(e.own[band])!))!;
+    for (const { p, own } of judged) {
+      const mine = share(own[band])!;
+      const before = worst.get(p.id);
+      if (mine < ODD.fraction * typical && (!before || mine < before.right / before.steps)) {
+        worst.set(p.id, { id: p.id, borewellId: p.borewellId, ...own[band], typical });
+      }
     }
   }
-  result.oddOnesOut.sort((a, b) => a.right / a.steps - b.right / b.steps);
+  result.oddOnesOut = [...worst.values()].sort((a, b) => a.right / a.steps - b.right / b.steps);
   return result;
 }
