@@ -1,0 +1,26 @@
+[package]
+name = "stratavision"
+version = "0.1.0"
+description = "StrataVision: a proposed picture of the ground, built from StrataField's borewell records"
+authors = ["Mehul"]
+license = "MIT"
+repository = "https://github.com/Mehulsri07/StrataVision"
+edition = "2021"
+
+[lib]
+# The `_lib` suffix keeps the lib name from clashing with the bin name on Windows
+# (https://github.com/rust-lang/cargo/issues/8519).
+name = "stratavision_lib"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+strata_db = { path = "../../strata/core/db" }
+# Must stay the same version as strata_db's, so both use one SQLite and one Connection type.
+rusqlite = { version = "0.40.2", features = ["bundled"] }
+
+[dev-dependencies]
+tempfile = "3"

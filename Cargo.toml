@@ -1,0 +1,13 @@
+[workspace]
+resolver = "2"
+members = ["app/src-tauri"]
+# StrataField (the `strata` submodule) is its own workspace; its database crate is used by path.
+exclude = ["strata"]
+
+# Read the optimization guideline for more details: https://tauri.app/concept/size/#cargo-configuration
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 3
+panic = "abort"
+strip = true
