@@ -2,10 +2,10 @@ import { useCallback, useEffect, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SiteMap, located } from "@/components/SiteMap";
-import { loadData, type LoadError, type SiteRecord } from "@/lib/api";
+import { loadData, type LoadError, type Records } from "@/lib/api";
 import { text } from "@/text";
 
-type State = { sites: SiteRecord[] } | { problem: LoadError } | null;
+type State = { records: Records } | { problem: LoadError } | null;
 
 export default function App() {
   const [state, setState] = useState<State>(null);
@@ -14,7 +14,7 @@ export default function App() {
   // Reading again keeps what is on screen until the new records arrive, so the map does not blink.
   const load = useCallback(() => {
     loadData().then(
-      (sites) => setState({ sites }),
+      (records) => setState({ records }),
       (e) => setState({ problem: isLoadError(e) ? e : { kind: "other", message: String(e) } }),
     );
   }, []);
@@ -43,7 +43,7 @@ function Body({ state, selectedId, onSelect }: { state: State; selectedId: strin
     const p = state.problem;
     return <Message detail={p.kind === "other" ? p.message : undefined}>{text.problems[p.kind]}</Message>;
   }
-  const { sites } = state;
+  const { sites } = state.records;
   if (sites.length === 0) return <Message>{text.empty}</Message>;
 
   const shown = located(sites).length;

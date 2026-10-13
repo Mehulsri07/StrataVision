@@ -6,8 +6,10 @@ use serde::Serialize;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use strata_db::db::DB_FILE_NAME;
-use strata_db::models::{Borewell, PipeSegment, SearchFilters, StrataLayer, WaterReading};
-use strata_db::repo::{borewells, layers};
+use strata_db::models::{
+    Borewell, Material, PipeSegment, SearchFilters, StrataLayer, WaterReading,
+};
+use strata_db::repo::{borewells, layers, materials};
 use strata_db::schema;
 
 /// Name of the folder, inside the roaming app-data folder, that every Strata app shares.
@@ -21,6 +23,15 @@ pub struct SiteRecord {
     pub strata: Vec<StrataLayer>,
     pub pipes: Vec<PipeSegment>,
     pub water_readings: Vec<WaterReading>,
+}
+
+/// Everything read in one go, all as it was at the same moment.
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct Records {
+    pub sites: Vec<SiteRecord>,
+    /// Every soil type, built-in and added by hand; layers refer to them by id.
+    pub materials: Vec<Material>,
 }
 
 /// Why the records could not be read. The screens choose the wording from `kind`.
@@ -55,11 +66,11 @@ pub fn data_dir(roaming_app_data: &Path) -> PathBuf {
     }
 }
 
-/// Every borewell that is not in the Recycle bin, read from `<data_dir>/strata.db` as it is at
+/// Every borewell that is not in the Recycle bin, and the soil types, read from `<data_dir>/strata.db` as it is at
 /// this moment. The file is opened read-only: the records are never upgraded or changed, and the
 /// folder and the file are never created. SQLite may add its two bookkeeping files (`-wal` and
 /// `-shm`) beside an existing database, exactly as StrataField itself does.
-pub fn load(data_dir: &Path) -> Result<Vec<SiteRecord>, LoadError> {
+pub fn load(data_dir: &Path) -> Result<Records, LoadError> {
     let path = data_dir.join(DB_FILE_NAME);
     if !path.exists() {
         return Err(LoadError::NoDatabase);
@@ -87,7 +98,10 @@ pub fn load(data_dir: &Path) -> Result<Vec<SiteRecord>, LoadError> {
             strata: item.strata,
         });
     }
-    Ok(sites)
+    Ok(Records {
+        sites,
+        materials: materials::list(&tx)?,
+    })
 }
 
 #[cfg(test)]
@@ -202,7 +216,13 @@ mod tests {
         assert!(!tmp.path().join("strata.db-shm").exists());
         let before = std::fs::read(&db_file).unwrap();
 
-        let got = load(tmp.path()).unwrap();
+        let records = load(tmp.path()).unwrap();
+        // The soil types come with the records: hand-added ones are only known to the database.
+        assert!(records
+            .materials
+            .iter()
+            .any(|m| m.id == "clay" && m.lithology_class.as_deref() == Some("CLAY")));
+        let got = records.sites;
         assert_eq!(got.len(), 2);
         let full = site(&got, "BW-1");
         assert_eq!(full.strata.len(), 1);
@@ -226,7 +246,7 @@ mod tests {
     fn loads_while_another_app_has_it_open() {
         let tmp = tempfile::tempdir().unwrap();
         let _open = seeded(tmp.path());
-        assert_eq!(load(tmp.path()).unwrap().len(), 2);
+        assert_eq!(load(tmp.path()).unwrap().sites.len(), 2);
     }
 
     #[test]
@@ -243,7 +263,7 @@ mod tests {
         })
         .unwrap();
         drop(db);
-        let got = load(tmp.path()).unwrap();
+        let got = load(tmp.path()).unwrap().sites;
         assert_eq!(got.len(), 1);
         assert_eq!(got[0].borewell.borewell_id, "BW-2");
     }
