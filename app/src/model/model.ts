@@ -127,6 +127,9 @@ export function predictColumn(
   return column;
 }
 
+/** The group with the largest share; a tie goes to the earlier group. */
+export const largest = (shares: Record<Group, number>) => GROUPS.reduce((a, b) => (shares[b] > shares[a] ? b : a));
+
 const apart = (a: { x: number; y: number }, b: { x: number; y: number }) => Math.hypot(a.x - b.x, a.y - b.y);
 
 function vote(voters: { c: { p: Prepared; x: number; y: number; km: number }; group: Group }[]): Pick<Step, "shares" | "likely" | "confidence" | "sources"> {
@@ -149,7 +152,7 @@ function vote(voters: { c: { p: Prepared; x: number; y: number; km: number }; gr
   const sites: (typeof voters)[number]["c"][] = [];
   for (const { c } of voters) if (!sites.some((s) => apart(s, c) <= SAME_SITE_KM)) sites.push(c);
 
-  const best = GROUPS.reduce((a, b) => (shares[b] > shares[a] ? b : a));
+  const best = largest(shares);
   const nearestKm = voters[0].c.km;
   const confidence: Confidence =
     nearestKm <= LIKELY.nearestKm && sites.length >= LIKELY.sites && shares[best] >= LIKELY.share ? "likely"
