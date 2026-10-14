@@ -50,7 +50,12 @@ function placesAlong(path: LatLon[], count: number) {
   });
 }
 
-export function sectionAlong(path: LatLon[], halfWidthKm: number, prepared: Prepared[], grid: ElevationGrid, borewells: Borewell[], count = 200): Section {
+/** Points closer than this to the one before are the same point clicked twice, not a bend. */
+export const SAME_POINT_KM = 0.005;
+
+export function sectionAlong(given: LatLon[], halfWidthKm: number, prepared: Prepared[], grid: ElevationGrid, borewells: Borewell[], count = 200): Section {
+  const path: LatLon[] = [];
+  for (const p of given) if (!path.length || kmBetween(...path[path.length - 1], ...p) >= SAME_POINT_KM) path.push(p);
   if (path.length < 2) return { lengthKm: 0, columns: [], borewells: [], nearby: 0, bendsKm: [] };
   const columns = placesAlong(path, count).map(({ km, latitude, longitude }) => {
     const groundM = heightAt(grid, latitude, longitude);

@@ -60,6 +60,12 @@ describe("sectionAlong", () => {
     expect(s.columns[4].waterFt).toBeNull();
   });
 
+  it("ignores a point clicked twice, so it is not a bend", () => {
+    const s = along([CENTRE, [north(0), east(1)], [north(0.001), east(1)], [north(0), east(2)]], []);
+    expect(s.bendsKm).toEqual([expect.closeTo(1, 1)]);
+    expect(along([CENTRE, [north(0.001), east(0)]], [])).toMatchObject({ lengthKm: 0, columns: [] });
+  });
+
   it("is empty for fewer than two points", () => {
     expect(along([CENTRE], [site("a", north(0), east(0), CLAY)])).toEqual({ lengthKm: 0, columns: [], borewells: [], nearby: 0, bendsKm: [] });
   });

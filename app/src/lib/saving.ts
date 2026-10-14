@@ -10,7 +10,7 @@ const PRINT_COLOURS: Record<string, string> = { "--foreground": "#16202a", "--mu
 export function printableSvg(markup: string): string {
   return markup
     .replace("<svg ", `<svg xmlns="http://www.w3.org/2000/svg" `)
-    .replace(/(<svg[^>]*>)/, `$1<style>text{font-family:Helvetica,Arial,sans-serif}</style><rect width="100%" height="100%" fill="#ffffff"/>`)
+    .replace(/(<svg[^>]*>)/, `$1<style>text{font-family:Helvetica,Arial,sans-serif;font-size:11px}</style><rect width="100%" height="100%" fill="#ffffff"/>`)
     .replace(/var\((--[a-z-]+)\)/g, (_, name: string) => PRINT_COLOURS[name] ?? "#000000");
 }
 

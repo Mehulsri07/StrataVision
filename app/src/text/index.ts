@@ -41,7 +41,7 @@ export const text = {
   groundFailed: "The ground heights could not be read, so layers cannot be proposed.",
   notEnoughHere: "There are not enough borewells near this spot to say anything.",
   fromBorewells: (n: number, nearest: string) => (n === 1 ? `From 1 borewell, ${nearest} away` : `From ${n} borewells, nearest ${nearest}`),
-  noGroundHere: "The ground height is not known at this spot, so layers cannot be proposed here.",
+  noGroundHere: "The ground height is not known here, so layers cannot be proposed.",
   waterExpected: (feet: number, nearest: string, since: string) =>
     `Water level expected about ${feet} ft below ground (nearest reading ${nearest} away; levels measured since ${since})`,
   noWater: "No recent water level within 1 km",

@@ -44,7 +44,8 @@ export function SectionDrawing({ section: s, ref }: { section: Section; ref?: Re
   ].filter((g): g is number => g != null);
   const highFt = Math.max(...grounds) + 5;
   const lowFt = Math.min(highFt - 50, ...bottoms);
-  const x = (km: number) => L + (s.lengthKm ? (km / s.lengthKm) * PW : 0);
+  // Borewells up to 50 m past either end belong to the line; they are drawn at its end.
+  const x = (km: number) => L + (s.lengthKm ? (Math.min(Math.max(km, 0), s.lengthKm) / s.lengthKm) * PW : 0);
   const y = (ft: number) => TOP + ((highFt - ft) / (highFt - lowFt)) * PH;
   const colW = PW / Math.max(1, s.columns.length - 1);
 
@@ -83,7 +84,7 @@ export function SectionDrawing({ section: s, ref }: { section: Section; ref?: Re
   }
 
   return (
-    <svg ref={ref} viewBox={`0 0 ${W} ${H}`} width={W} role="img" aria-label={text.section.drawingLabel} className="h-auto max-w-full text-[11px]">
+    <svg ref={ref} viewBox={`0 0 ${W} ${H}`} width={W} role="img" aria-label={text.section.drawingLabel} fontSize={11} className="h-auto max-w-full">
       <defs>
         <pattern id="section-hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
           <line x1="0" y1="0" x2="0" y2="6" stroke="var(--muted-foreground)" strokeOpacity="0.45" />

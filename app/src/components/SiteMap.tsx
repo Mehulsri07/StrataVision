@@ -14,7 +14,7 @@ export const located = (sites: SiteRecord[]) => sites.filter((s) => s.borewell.l
  * The borewells on OpenStreetMap's online tiles. Without internet the tiles are a plain background
  * and the pins still show. Clicking a pin selects that borewell; clicking anywhere else picks the spot.
  */
-export function SiteMap({ sites, selectedId, picked, onSelect, onPick, children }: {
+export function SiteMap({ sites, selectedId, picked, onSelect, onPick, children, doubleClickZoom = true }: {
   sites: SiteRecord[];
   selectedId: string | null;
   picked: [number, number] | null;
@@ -22,10 +22,12 @@ export function SiteMap({ sites, selectedId, picked, onSelect, onPick, children 
   onPick: (latitude: number, longitude: number) => void;
   /** Anything else to draw on the map, such as a section line. */
   children?: ReactNode;
+  /** Off where every click adds a point: a double-click would add two and zoom too. */
+  doubleClickZoom?: boolean;
 }) {
   const pins = useMemo(() => located(sites), [sites]);
   return (
-    <MapContainer center={CITY_CENTRE} zoom={12} preferCanvas className="strata-map z-0 h-full w-full cursor-crosshair bg-map-land">
+    <MapContainer center={CITY_CENTRE} zoom={12} doubleClickZoom={doubleClickZoom} preferCanvas className="strata-map z-0 h-full w-full cursor-crosshair bg-map-land">
       <TileLayer
         url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'

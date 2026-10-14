@@ -8,6 +8,7 @@ describe("saving", () => {
     expect(svg).toContain('xmlns="http://www.w3.org/2000/svg"');
     expect(svg).toContain('fill="#16202a"');
     expect(svg).not.toContain("var(");
+    expect(svg).toContain("font-size:11px"); // the screen's text size, which a class would lose
   });
 
   it("wraps words into lines that fit", () => {

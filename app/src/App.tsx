@@ -62,7 +62,7 @@ export default function App() {
           <>
             {/* The maps stay mounted behind the other screens, so they keep their place, the picked spot and the line. */}
             <div className={view === "map" ? "flex min-h-0 flex-1" : "hidden"}><MapView records={records} model={model} onHowGood={() => setView("quality")} /></div>
-            {sectionSeen && <div className={view === "section" ? "flex min-h-0 flex-1" : "hidden"}><SectionView records={records} model={model} /></div>}
+            {sectionSeen && <div className={view === "section" ? "flex min-h-0 flex-1" : "hidden"}><SectionView records={records} model={model} onHowGood={() => setView("quality")} /></div>}
             {view === "quality" && <QualityView model={model} />}
           </>
         )}
