@@ -3,7 +3,8 @@
 // 1. Started on a data folder that does not exist, it explains in plain words that there are no
 //    records yet, and leaves no trace (the folder is not created).
 // 2. Started on made-up borewells, clicking a spot on the map shows proposed layers there,
-//    Data quality reports on them, and a line drawn on the Section map draws the section.
+//    Data quality reports on them, and a line drawn on the Section map draws the section, flat
+//    and as a 3D slice.
 //
 // Build first: npm run tauri -w app -- build --debug --no-bundle
 import { execFileSync, spawn } from "node:child_process";
@@ -124,6 +125,8 @@ const scenarios = {
         await expectScreen("borewells within 500 m of the line");
         await expectScreen("Save as PDF");
         if (!(await js("!!document.querySelector('svg[aria-label^=\"Section along\"]')"))) throw new Error("the section was not drawn");
+        await js("[...document.querySelectorAll('button')].find((b) => b.innerText.trim() === '3D slice').click()");
+        await expectScreen("Drag to turn and tilt the slice");
       });
     } finally {
       rmSync(dataDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 500 }); // the app may still be letting go
