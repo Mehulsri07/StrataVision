@@ -56,6 +56,24 @@ export const text = {
   andMore: (k: number) => `and ${k} more`,
   howGood: "How good are these estimates?",
 
+  drilling: {
+    title: "Drilling suggestion",
+    note: "From past drilling nearby. The driller decides.",
+    doneNearby: "What was done nearby",
+    drilled: (low: number, middle: number, high: number) => (low === high ? `Drilled ${low} ft deep` : `Drilled ${low} to ${high} ft deep (middle ${middle} ft)`),
+    pump: (low: number, middle: number, high: number) => (low === high ? `Pump at ${low} ft` : `Pumps at ${low} to ${high} ft (middle ${middle} ft)`),
+    well: (id: string, distance: string, drilled: number | null) => `${id} · ${distance}${drilled != null ? ` · ${drilled} ft deep` : ""}`,
+    suggest: "What the records suggest",
+    water: (feet: number) => `Water level about ${feet} ft`,
+    slotted: (top: number, bottom: number, level: string) => `Slotted pipe ${top} to ${bottom} ft (${level.toLowerCase()})`,
+    drillTo: (feet: number) => `How deep to drill: about ${feet} ft`,
+    drillToNote: "Never deeper than the deepest borewell nearby. This rule is still to be confirmed by DWO.",
+    noWater: "There is no recent water level within 1 km, so no slotted pipe or depth is suggested.",
+    noWaterBearing: "No water-bearing sand of 10 ft or more is proposed below the water level here, so no slotted pipe or depth is suggested.",
+    keyNearby: "Slotted pipe in the nearest borewells, at the same height",
+    keySuggested: "Slotted pipe suggested",
+  },
+
   quality: {
     checking: "Checking…",
     notEnough: "There are not enough borewells with layers and a location to check yet (at least 10 are needed).",

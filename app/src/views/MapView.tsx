@@ -4,6 +4,7 @@ import { NOTHING_PROPOSED, NothingProposedPattern, ProposedColumn, RecordedColum
 import { SiteMap, located } from "@/components/SiteMap";
 import type { Records, SiteRecord } from "@/lib/api";
 import type { Model } from "@/lib/useModel";
+import { nearbyWells, suggestDrilling, type Suggestion } from "@/model/drilling";
 import { predictColumn } from "@/model/model";
 import { GROUP_COLOUR, blocks, distanceInWords, sharesInWords, summary, waterHere, type Block } from "@/model/words";
 import { text } from "@/text";
@@ -37,7 +38,7 @@ export function MapView({ records, model, onHowGood }: { records: Records; model
         <div className="space-y-3 border-t pt-4">
           {site ? <Recorded site={site} sites={sites} onSelect={(id) => setChosen({ borewell: id })} />
             // Keyed by the spot, so a layer selected at one spot is not carried to the next.
-            : spot ? <Proposed key={spot.join()} spot={spot} model={model} borewells={borewells} onHowGood={onHowGood} />
+            : spot ? <Proposed key={spot.join()} spot={spot} model={model} sites={sites} borewells={borewells} onHowGood={onHowGood} />
             : <p className="text-muted-foreground">{text.pickHint}</p>}
         </div>
       </aside>
@@ -80,11 +81,12 @@ function Recorded({ site: { borewell: b, strata }, sites, onSelect }: { site: Si
   );
 }
 
-function Proposed({ spot, model, borewells, onHowGood }: { spot: [number, number]; model: Model | "failed" | null; borewells: Borewell[]; onHowGood: () => void }) {
+function Proposed({ spot, model, sites, borewells, onHowGood }: { spot: [number, number]; model: Model | "failed" | null; sites: SiteRecord[]; borewells: Borewell[]; onHowGood: () => void }) {
   const ready = model && model !== "failed" ? model : null;
   // Worked out again when the records change, so a reload shows the new answer for the same spot.
   const column = useMemo(() => (ready ? predictColumn(spot[0], spot[1], ready.prepared, ready.grid) : null), [spot, ready]);
   const water = useMemo(() => waterHere(spot[0], spot[1], borewells), [spot, borewells]);
+  const nearby = useMemo(() => (ready ? nearbyWells(spot[0], spot[1], sites, ready.grid) : []), [spot, sites, ready]);
   const [picked, setPicked] = useState<{ top: number; bottom: number } | null>(null);
 
   const heading = <h2 className="text-base font-semibold">{text.proposedHere}</h2>;
@@ -101,18 +103,23 @@ function Proposed({ spot, model, borewells, onHowGood }: { spot: [number, number
   for (const step of column) if (step.likely) for (const s of step.sources) behind.set(s.id, s.km);
   // The selected stretch, if it still exists: after a reload the layers may have moved.
   const selected = picked ? blocks(column).find((b) => b.top === picked.top && b.bottom === picked.bottom) ?? null : null;
+  const suggestion = suggestDrilling(column, water, nearby);
   return (
     <>
       {heading}
       <p>{text.fromBorewells(behind.size, distanceInWords(Math.min(...behind.values())))}</p>
       {waterLine}
-      <ProposedColumn column={column} waterFt={water?.feet} selected={selected} onSelect={(b) => setPicked({ top: b.top, bottom: b.bottom })} />
+      <ProposedColumn column={column} waterFt={water?.feet} selected={selected} onSelect={(b) => setPicked({ top: b.top, bottom: b.bottom })}
+        nearbySlotted={nearby.map((n) => n.slotted)} suggestedSlotted={suggestion?.proposal?.slotted} />
       <ul className="space-y-1 text-muted-foreground">
         <li className="flex items-center gap-2"><Swatch opacity={0.6} dash="6 4" />{text.levelMeaning.likely}</li>
         <li className="flex items-center gap-2"><Swatch opacity={0.3} dash="1.5 4" />{text.levelMeaning.rough}</li>
         <li className="flex items-center gap-2"><Swatch />{text.levelMeaning.none}</li>
+        {nearby.some((n) => n.slotted.length) && <li className="flex items-center gap-2"><PipeSwatch />{text.drilling.keyNearby}</li>}
+        {suggestion?.proposal && <li className="flex items-center gap-2"><PipeSwatch suggested />{text.drilling.keySuggested}</li>}
       </ul>
       {selected ? <BlockDetails block={selected} /> : <p className="text-muted-foreground">{text.clickLayer}</p>}
+      {suggestion && <Drilling s={suggestion} />}
       {howGood}
     </>
   );
@@ -137,6 +144,40 @@ function BlockDetails({ block }: { block: Block }) {
         </>
       )}
     </div>
+  );
+}
+
+/** Both halves of the drilling suggestion, always together, so the suggestion can be weighed against what was done. */
+function Drilling({ s }: { s: Suggestion }) {
+  const t = text.drilling, ft = (n: number) => Math.round(n);
+  return (
+    <section className="space-y-2 rounded-md border p-3">
+      <h3 className="font-semibold">{t.title}</h3>
+      <p className="text-muted-foreground">{t.note}</p>
+      <h4 className="pt-1 font-medium">{t.doneNearby}</h4>
+      {s.drilled && <p>{t.drilled(ft(s.drilled.low), ft(s.drilled.middle), ft(s.drilled.high))}</p>}
+      {s.pump && <p>{t.pump(ft(s.pump.low), ft(s.pump.middle), ft(s.pump.high))}</p>}
+      <ul className="text-muted-foreground">
+        {s.nearby.map((n) => <li key={n.id}>{t.well(n.borewellId, distanceInWords(n.km), n.drilledFt != null ? ft(n.drilledFt) : null)}</li>)}
+      </ul>
+      <h4 className="pt-1 font-medium">{t.suggest}</h4>
+      {s.proposal ? (
+        <>
+          <p>{t.water(ft(s.proposal.waterFt))}</p>
+          <ul>{s.proposal.slotted.map((p) => <li key={p.top}>{t.slotted(ft(p.top), ft(p.bottom), text.levels[p.level])}</li>)}</ul>
+          <p className="font-medium">{t.drillTo(ft(s.proposal.drillToFt))}</p>
+          <p className="text-muted-foreground">{t.drillToNote}</p>
+        </>
+      ) : <p>{s.noProposal === "noWater" ? t.noWater : t.noWaterBearing}</p>}
+    </section>
+  );
+}
+
+function PipeSwatch({ suggested = false }: { suggested?: boolean }) {
+  return (
+    <svg width="18" height="14" className="shrink-0" aria-hidden="true">
+      <line x1="9" x2="9" y1="1" y2="13" stroke="#2f7fb8" strokeWidth={suggested ? 4 : 2} strokeDasharray={suggested ? "5 3" : undefined} />
+    </svg>
   );
 }
 

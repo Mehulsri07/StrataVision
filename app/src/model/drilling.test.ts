@@ -69,6 +69,12 @@ describe("suggestDrilling", () => {
     expect(s.noProposal).toBeNull();
   });
 
+  it("judges a stretch only by the part below the water level", () => {
+    // Rough above the water, likely below it: the slotted pipe goes only in the likely part.
+    const s = suggestDrilling([...run(0, 40, "clay"), ...run(40, 55, "waterBearing", "rough"), ...run(55, 110, "waterBearing"), ...run(110, 150, "clay")], water(59), [nb(200)])!;
+    expect(s.proposal!.slotted).toEqual([{ top: 59, bottom: 110, level: "likely" }]);
+  });
+
   it("drills to the bottom of the lowest stretch", () => {
     expect(suggestDrilling(COLUMN, water(50), [nb(200)])!.proposal!.drillToFt).toBe(160);
   });

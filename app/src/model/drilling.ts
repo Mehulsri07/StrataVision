@@ -122,13 +122,15 @@ export function suggestDrilling(column: readonly Step[], water: WaterHere | null
   };
   for (const step of column) {
     const wet = step.likely === "waterBearing" && step.confidence !== "none";
+    // Only the part below the water level gets slotted pipe, so only it says how sure the stretch is.
+    const rough = step.confidence === "rough" && step.bottom > water.feet;
     if (!wet || (open && open.bottom !== step.top)) close();
     if (!wet) continue;
     if (open) {
       open.bottom = step.bottom;
-      open.rough ||= step.confidence === "rough";
+      open.rough ||= rough;
     } else {
-      open = { top: step.top, bottom: step.bottom, rough: step.confidence === "rough" };
+      open = { top: step.top, bottom: step.bottom, rough };
     }
   }
   close();

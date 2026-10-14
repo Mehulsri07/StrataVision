@@ -1,6 +1,7 @@
 import type { KeyboardEvent, ReactNode } from "react";
 import type { StrataLayer } from "@strata/core";
 import type { Step } from "@/model/model";
+import type { Span } from "@/model/drilling";
 import { GROUP_COLOUR, GROUP_NAME, blocks, type Block } from "@/model/words";
 import { text } from "@/text";
 
@@ -76,14 +77,18 @@ export function NothingProposedPattern() {
  * is only a rough guess; and left empty, hatched, where there is not enough data to propose anything.
  * Its water level, being worked out too, is a dashed line.
  */
-export function ProposedColumn({ column, waterFt, selected, onSelect }: {
+export function ProposedColumn({ column, waterFt, selected, onSelect, nearbySlotted = [], suggestedSlotted = [] }: {
   column: readonly Step[]; waterFt?: number | null; selected: Block | null; onSelect: (block: Block) => void;
+  /** Each nearby borewell's slotted pipe, at the same height: thin lines inside the column's right edge. */
+  nearbySlotted?: Span[][];
+  /** Where slotted pipe is suggested: dashed lines inside the column's left edge. */
+  suggestedSlotted?: Span[];
 }) {
   const all = blocks(column);
   const depth = all[all.length - 1]?.bottom ?? 1;
   return (
     <Frame depth={depth} marks={[0, ...all.map((b) => b.bottom)]} water={waterFt != null ? { feet: waterFt, expected: true } : null} label={text.proposedHere} clickable>
-      {(y, labelY) => all.map((b) => {
+      {(y, labelY) => [...all.map((b) => {
         const name = b.group ? GROUP_NAME[b.group] : text.levels.none;
         const at = labelY(b.top, b.bottom);
         const isSelected = selected?.top === b.top && selected.bottom === b.bottom;
@@ -111,7 +116,16 @@ export function ProposedColumn({ column, waterFt, selected, onSelect }: {
             )}
           </g>
         );
-      })}
+      }),
+        ...nearbySlotted.flatMap((spans, i) => spans.map((p, j) => {
+          const [top, bottom] = [Math.max(0, p.top), Math.min(depth, p.bottom)];
+          const x = COL_X + COL_W - 4 - 4 * i;
+          return bottom > top ? <line key={`n${i}-${j}`} x1={x} x2={x} y1={y(top)} y2={y(bottom)} stroke={WATER} strokeWidth="2" pointerEvents="none" /> : null;
+        })),
+        ...suggestedSlotted.map((p, j) => (
+          <line key={`s${j}`} x1={COL_X + 5} x2={COL_X + 5} y1={y(p.top)} y2={y(Math.min(depth, p.bottom))} stroke={WATER} strokeWidth="4" strokeDasharray="5 3" pointerEvents="none" />
+        )),
+      ]}
     </Frame>
   );
 }

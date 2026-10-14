@@ -106,6 +106,8 @@ const scenarios = {
         await expectScreen("Water-bearing sand");
         await expectScreen("Water level expected about");
         await expectScreen("levels measured since 2023");
+        await expectScreen("Drilling suggestion");
+        await expectScreen("How deep to drill: about");
         // The middle pin is two borewells on top of each other; the panel offers both.
         await click(x - 60, y - 45);
         await expectScreen("2 borewells are at this spot:");
