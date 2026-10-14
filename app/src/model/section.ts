@@ -33,6 +33,8 @@ export interface Section {
   borewells: SectionBorewell[];
   /** How many borewells are within reach of the line, drawn or not. */
   nearby: number;
+  /** Where the line bends, as distances along it. */
+  bendsKm: number[];
 }
 
 /** `count` evenly spaced places along a line with bends, with their distance along it. */
@@ -49,7 +51,7 @@ function placesAlong(path: LatLon[], count: number) {
 }
 
 export function sectionAlong(path: LatLon[], halfWidthKm: number, prepared: Prepared[], grid: ElevationGrid, borewells: Borewell[], count = 200): Section {
-  if (path.length < 2) return { lengthKm: 0, columns: [], borewells: [], nearby: 0 };
+  if (path.length < 2) return { lengthKm: 0, columns: [], borewells: [], nearby: 0, bendsKm: [] };
   const columns = placesAlong(path, count).map(({ km, latitude, longitude }) => {
     const groundM = heightAt(grid, latitude, longitude);
     return {
@@ -62,5 +64,7 @@ export function sectionAlong(path: LatLon[], halfWidthKm: number, prepared: Prep
   const lengthKm = columns[columns.length - 1].km;
   const { placed } = placeAlongPath(path, halfWidthKm, prepared);
   const shown = thinAlongLine(placed, lengthKm);
-  return { lengthKm, columns, borewells: shown.map(({ item, alongKm, offsetKm }) => ({ p: item, alongKm, offsetKm })), nearby: placed.length };
+  const bendsKm: number[] = [];
+  for (let i = 1, km = 0; i < path.length - 1; i++) bendsKm.push((km += kmBetween(path[i - 1][0], path[i - 1][1], path[i][0], path[i][1])));
+  return { lengthKm, columns, borewells: shown.map(({ item, alongKm, offsetKm }) => ({ p: item, alongKm, offsetKm })), nearby: placed.length, bendsKm };
 }

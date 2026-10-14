@@ -1,5 +1,5 @@
 import "leaflet/dist/leaflet.css";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, type ReactNode } from "react";
 import { CircleMarker, MapContainer, TileLayer, Tooltip, useMap, useMapEvents } from "react-leaflet";
 import type { LatLngBoundsExpression, LatLngExpression } from "leaflet";
 import type { SiteRecord } from "@/lib/api";
@@ -14,12 +14,14 @@ export const located = (sites: SiteRecord[]) => sites.filter((s) => s.borewell.l
  * The borewells on OpenStreetMap's online tiles. Without internet the tiles are a plain background
  * and the pins still show. Clicking a pin selects that borewell; clicking anywhere else picks the spot.
  */
-export function SiteMap({ sites, selectedId, picked, onSelect, onPick }: {
+export function SiteMap({ sites, selectedId, picked, onSelect, onPick, children }: {
   sites: SiteRecord[];
   selectedId: string | null;
   picked: [number, number] | null;
   onSelect: (id: string) => void;
   onPick: (latitude: number, longitude: number) => void;
+  /** Anything else to draw on the map, such as a section line. */
+  children?: ReactNode;
 }) {
   const pins = useMemo(() => located(sites), [sites]);
   return (
@@ -52,6 +54,7 @@ export function SiteMap({ sites, selectedId, picked, onSelect, onPick }: {
       })}
       {/* The picked spot: an open, dashed ring, so it cannot be taken for a borewell. */}
       {picked && <CircleMarker center={picked} radius={11} interactive={false} pathOptions={{ color: "#16202a", weight: 2, dashArray: "4 4", fill: false }} />}
+      {children}
     </MapContainer>
   );
 }

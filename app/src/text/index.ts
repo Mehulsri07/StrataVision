@@ -3,7 +3,7 @@ export const text = {
   appName: "StrataVision",
   loading: "Reading your borewell records…",
   refresh: "Refresh",
-  tabs: { map: "Map", quality: "Data quality" },
+  tabs: { map: "Map", section: "Section", quality: "Data quality" },
 
   /** Why the records could not be shown, by the kind of problem the Rust side reports. */
   problems: {
@@ -76,6 +76,31 @@ export const text = {
     nearbyShallower: "The borewells nearby all stop above the water-bearing sand proposed here, so no slotted pipe or depth is suggested.",
     keyNearby: "Slotted pipe in the nearest borewells, at the same height",
     keySuggested: "Slotted pipe suggested",
+  },
+
+  section: {
+    hint: "Click the map to draw a line through the ground. Each click adds a point, so the line can bend. Clicking a borewell puts the line through it.",
+    needTwo: "Click a second point to draw the section.",
+    undo: "Undo last point",
+    clear: "Clear",
+    width: "Show borewells within",
+    widthOption: (km: number) => (km < 1 ? `${km * 1000} m` : `${km} km`),
+    length: (km: number, bends: number) => `Line A to A′: ${km.toFixed(1)} km${bends ? `, ${bends === 1 ? "1 bend" : `${bends} bends`}` : ""}`,
+    nearby: (n: number, within: string) => `${n === 1 ? "1 borewell" : `${n} borewells`} within ${within} of the line`,
+    thinned: (shown: number) => `${shown} drawn: the one closest to the line in each stretch`,
+    nothing: "No borewell is within 5 km of any part of this line, so nothing can be proposed along it.",
+    drawingLabel: "Section along the line from A to A′",
+    heightAxis: "Feet above sea level",
+    kmAxis: "km along the line from A",
+    bend: "bend",
+    keyMeasured: "Measured at a borewell",
+    keyWater: "Water level expected",
+    savePicture: "Save as picture",
+    savePdf: "Save as PDF",
+    saved: (path: string) => `Saved to ${path}`,
+    saveFailed: "The file could not be saved.",
+    pdfTitle: "Section A to A′",
+    pdfKey: "Solid columns are borewells as measured. Everything between them is proposed from past drilling: faded where likely, paler where a rough guess, hatched where there is not enough data. Heights are feet above sea level.",
   },
 
   quality: {

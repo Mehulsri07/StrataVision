@@ -16,6 +16,7 @@ describe("sectionAlong", () => {
     expect(s.columns.map((c) => c.km)).toEqual([0, 1, 2, 3, 4].map((k) => expect.closeTo(k, 1)));
     expect(s.columns[3].latitude).toBeCloseTo(north(1), 4);
     expect(s.columns[3].longitude).toBeCloseTo(east(2), 4);
+    expect(s.bendsKm).toEqual([expect.closeTo(2, 1)]);
   });
 
   it("lines a layer up by height on sloping ground", () => {
@@ -60,6 +61,6 @@ describe("sectionAlong", () => {
   });
 
   it("is empty for fewer than two points", () => {
-    expect(along([CENTRE], [site("a", north(0), east(0), CLAY)])).toEqual({ lengthKm: 0, columns: [], borewells: [], nearby: 0 });
+    expect(along([CENTRE], [site("a", north(0), east(0), CLAY)])).toEqual({ lengthKm: 0, columns: [], borewells: [], nearby: 0, bendsKm: [] });
   });
 });

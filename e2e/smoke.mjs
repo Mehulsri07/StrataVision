@@ -2,8 +2,8 @@
 //
 // 1. Started on a data folder that does not exist, it explains in plain words that there are no
 //    records yet, and leaves no trace (the folder is not created).
-// 2. Started on made-up borewells, clicking a spot on the map shows proposed layers there, and
-//    Data quality reports on them.
+// 2. Started on made-up borewells, clicking a spot on the map shows proposed layers there,
+//    Data quality reports on them, and a line drawn on the Section map draws the section.
 //
 // Build first: npm run tauri -w app -- build --debug --no-bundle
 import { execFileSync, spawn } from "node:child_process";
@@ -114,6 +114,16 @@ const scenarios = {
         await js("[...document.querySelectorAll('header button')].find((b) => b.innerText.trim() === 'Data quality').click()");
         await expectScreen("Checked against 26 borewells");
         await expectScreen("BW-008"); // the one logged upside down
+        // A section across the middle of the made-up borewells.
+        await js("[...document.querySelectorAll('header button')].find((b) => b.innerText.trim() === 'Section').click()");
+        await expectScreen("Click the map to draw a line");
+        await sleep(2500);
+        const [sx, sy] = await js("(() => { const r = [...document.querySelectorAll('.leaflet-container')].find((m) => m.offsetParent).getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2 + 20]; })()");
+        await click(sx - 150, sy);
+        await click(sx + 150, sy);
+        await expectScreen("borewells within 500 m of the line");
+        await expectScreen("Save as PDF");
+        if (!(await js("!!document.querySelector('svg[aria-label^=\"Section along\"]')"))) throw new Error("the section was not drawn");
       });
     } finally {
       rmSync(dataDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 500 }); // the app may still be letting go

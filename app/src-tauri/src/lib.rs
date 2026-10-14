@@ -11,6 +11,9 @@ fn load_data(app: tauri::AppHandle) -> Result<data::Records, data::LoadError> {
 
 pub fn run() {
     tauri::Builder::default()
+        // Saving a section as a picture or PDF: the Save dialog, and writing the file chosen there.
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_fs::init())
         .setup(|app| Ok(open_main_window(app)?))
         .invoke_handler(tauri::generate_handler![load_data])
         .run(tauri::generate_context!())
