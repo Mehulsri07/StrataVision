@@ -344,10 +344,34 @@ mod tests {
                         latitude: located.then_some(26.83 + 0.01 * (at / 5) as f64),
                         longitude: located.then_some(80.93 + 0.01 * (at % 5) as f64),
                         total_depth: Some(200.0),
+                        pump_lowering: located.then_some(100.0 + 5.0 * (i % 7) as f64),
                         ..Default::default()
                     },
                     if located { &strata } else { &[] },
-                    &[],
+                    &if located {
+                        vec![
+                            PipeSegment {
+                                start_depth: 0.0,
+                                end_depth: 60.0,
+                                pipe_type: "plain".into(),
+                                ..Default::default()
+                            },
+                            PipeSegment {
+                                start_depth: 60.0,
+                                end_depth: 120.0,
+                                pipe_type: "slotted".into(),
+                                ..Default::default()
+                            },
+                            PipeSegment {
+                                start_depth: 120.0,
+                                end_depth: 200.0,
+                                pipe_type: "plain".into(),
+                                ..Default::default()
+                            },
+                        ]
+                    } else {
+                        vec![]
+                    },
                 )?;
                 if located {
                     repo::layers::add_water_reading(
