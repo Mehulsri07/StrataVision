@@ -14,15 +14,19 @@ const LAND = "#e9e4d6";
  * section, placed with CSS 3D transforms; only sides facing outwards are shown, so the inside of the
  * block never is. The top is the strip of ground with the borewells inside it as pins.
  */
-export function SliceView({ slice, stretch }: { slice: Slice; stretch: number }) {
+export function SliceView({ slice }: { slice: Slice }) {
   const [view, setView] = useState(START);
   const drag = useRef<{ x: number; y: number } | null>(null);
 
   const xs = slice.top.map((p) => p[0]), ys = slice.top.map((p) => p[1]);
   const [minE, maxE, minN, maxN] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
   const pxPerKm = SIZE / Math.max(maxE - minE, maxN - minN, 0.01);
-  // Feet to pixels at true scale, times the stretch.
-  const pxPerFt = (pxPerKm / (1000 * METRES_TO_FEET)) * stretch;
+  const trueFt = pxPerKm / (1000 * METRES_TO_FEET); // feet to pixels, unstretched
+  // At first the heights are stretched so the block is about half as tall as it is long, however
+  // long the line; the slider then goes from true scale to well past that.
+  const fit = Math.max(1, Math.round((0.5 * SIZE) / ((slice.highFt - slice.lowFt) * trueFt)));
+  const [stretch, setStretch] = useState(fit);
+  const pxPerFt = trueFt * stretch;
   const height = (slice.highFt - slice.lowFt) * pxPerFt;
   const y = (ft: number) => (slice.highFt - Math.min(ft, slice.highFt)) * pxPerFt;
   /** Where a side's edge starts: at the ground, or at the bottom where the ground is not known. */
@@ -82,7 +86,8 @@ export function SliceView({ slice, stretch }: { slice: Slice; stretch: number })
     drag.current = { x: e.clientX, y: e.clientY };
   };
   const onKeyDown = (e: KeyboardEvent) => {
-    const step = { ArrowLeft: [-5, 0], ArrowRight: [5, 0], ArrowUp: [0, -5], ArrowDown: [0, 5] }[e.key];
+    // As dragging does: down tips the block towards a view from above.
+    const step = { ArrowLeft: [-5, 0], ArrowRight: [5, 0], ArrowUp: [0, 5], ArrowDown: [0, -5] }[e.key];
     if (!step) return;
     e.preventDefault();
     turnBy(step[0], step[1]);
@@ -91,11 +96,15 @@ export function SliceView({ slice, stretch }: { slice: Slice; stretch: number })
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-        <span>{text.slice.howTo}</span>
+        <label className="flex items-center gap-2 text-foreground">
+          {text.slice.stretch(stretch)}
+          <input type="range" min={1} max={Math.max(100, fit * 4)} value={Math.min(stretch, Math.max(100, fit * 4))} onChange={(e) => setStretch(Number(e.target.value))} />
+        </label>
+        <span id="slice-how-to">{text.slice.howTo}</span>
         <button type="button" className="text-primary underline underline-offset-2" onClick={() => setView(START)}>{text.slice.reset}</button>
       </div>
       <div
-        role="img" aria-label={text.slice.label} tabIndex={0}
+        role="application" aria-roledescription={text.slice.roleDescription} aria-label={text.slice.label} aria-describedby="slice-how-to" tabIndex={0}
         className="relative h-[34rem] cursor-grab touch-none select-none overflow-hidden rounded-md border outline-none focus-visible:ring-2 focus-visible:ring-ring active:cursor-grabbing"
         style={{ perspective: "2200px" }}
         onPointerDown={(e) => {

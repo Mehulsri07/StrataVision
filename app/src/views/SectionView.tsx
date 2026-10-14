@@ -22,7 +22,6 @@ export function SectionView({ records, model, onHowGood }: { records: Records; m
   const [note, setNote] = useState<string | null>(null);
   const [mode, setMode] = useState<"flat" | "slice">("flat");
   const [depthKm, setDepthKm] = useState(0.5);
-  const [stretch, setStretch] = useState(25);
   const drawing = useRef<SVGSVGElement>(null);
   const t = text.section;
 
@@ -131,21 +130,15 @@ export function SectionView({ records, model, onHowGood }: { records: Records; m
                   ))}
                 </div>
                 {mode === "slice" && (
-                  <>
-                    <label className="flex items-center gap-2">
+                  <label className="flex items-center gap-2">
                       {text.slice.depth}
                       <select className="rounded-md border bg-background px-2 py-1" value={depthKm} onChange={(e) => setDepthKm(Number(e.target.value))}>
                         {WIDTHS.map((w) => <option key={w} value={w}>{t.widthOption(w)}</option>)}
-                      </select>
-                    </label>
-                    <label className="flex items-center gap-2">
-                      {text.slice.stretch(stretch)}
-                      <input type="range" min={5} max={100} step={5} value={stretch} onChange={(e) => setStretch(Number(e.target.value))} />
-                    </label>
-                  </>
+                    </select>
+                  </label>
                 )}
               </div>
-              {mode === "flat" ? <SectionDrawing section={section} ref={drawing} /> : slice && <SliceView slice={slice} stretch={stretch} />}
+              {mode === "flat" ? <SectionDrawing section={section} ref={drawing} /> : slice ? <SliceView key={`${path.join()} ${depthKm} ${widthKm}`} slice={slice} /> : <p>{text.noGroundHere}</p>}
             </div>
           )
           : <p>{section.columns.every((c) => c.groundFt == null) ? text.noGroundHere : t.nothing}</p>}

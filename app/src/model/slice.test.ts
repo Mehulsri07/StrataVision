@@ -20,6 +20,16 @@ describe("offsetPath", () => {
     expect(offsetPath([[0, 0], [2, 0], [2, 2]], 1)).toEqual([[0, 1], [1, 1], [1, 2]].map(close));
   });
 
+  it("never folds the back over where a short part follows a bend inwards", () => {
+    for (const [line, depth] of [[[[0, 0], [1, 0], [1, 0.3]], 0.5], [[[0, 0], [1, 0], [1, 0.2], [0.5, 0.2]], 2]] as [[number, number][], number][]) {
+      const back = offsetPath(line, depth);
+      for (let i = 0; i < line.length - 1; i++) {
+        const along = (back[i + 1][0] - back[i][0]) * (line[i + 1][0] - line[i][0]) + (back[i + 1][1] - back[i][1]) * (line[i + 1][1] - line[i][1]);
+        expect(along).toBeGreaterThanOrEqual(0);
+      }
+    }
+  });
+
   it("caps the corner of a sharp turn", () => {
     const [, corner] = offsetPath([[0, 0], [2, 0], [0, 0.1]], 1);
     expect(Math.hypot(corner[0] - 2, corner[1])).toBeLessThanOrEqual(3 + 1e-9);

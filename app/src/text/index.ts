@@ -110,6 +110,7 @@ export const text = {
     howTo: "Drag to turn and tilt the slice; the arrow keys work too. The front is the section along the line; the back and ends are cuts through the proposed ground.",
     reset: "Reset view",
     label: "The ground along the line as a slice that can be turned. Use the arrow keys to turn and tilt it.",
+    roleDescription: "3D view",
   },
 
   quality: {

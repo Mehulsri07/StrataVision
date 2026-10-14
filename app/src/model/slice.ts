@@ -42,15 +42,18 @@ const MITRE_CAP = 3;
 
 /** The line moved `km` to its left, its corners mitred. */
 export function offsetPath(points: XY[], km: number): XY[] {
-  const left = points.slice(1).map((q, i) => {
-    const [dx, dy] = [q[0] - points[i][0], q[1] - points[i][1]], len = Math.hypot(dx, dy);
-    return [-dy / len, dx / len] as XY;
-  });
+  const lengths = points.slice(1).map((q, i) => Math.hypot(q[0] - points[i][0], q[1] - points[i][1]));
+  const left = points.slice(1).map((q, i) => [-(q[1] - points[i][1]) / lengths[i], (q[0] - points[i][0]) / lengths[i]] as XY);
   return points.map((p, i) => {
-    const a = left[Math.max(0, i - 1)], b = left[Math.min(left.length - 1, i)];
+    const [ia, ib] = [Math.max(0, i - 1), Math.min(left.length - 1, i)], a = left[ia], b = left[ib];
     const [mx, my] = [a[0] + b[0], a[1] + b[1]], m = Math.hypot(mx, my);
     if (m < 1e-9) return [p[0] + a[0] * km * MITRE_CAP, p[1] + a[1] * km * MITRE_CAP]; // turned right back
-    const reach = Math.min(km / ((mx * a[0] + my * a[1]) / m), km * MITRE_CAP);
+    let reach = Math.min(km / ((mx * a[0] + my * a[1]) / m), km * MITRE_CAP);
+    // On the inside of a bend the corner slides back along both parts; it may use up at most half
+    // of the shorter one, so the back never folds over where a short part follows.
+    const slide = Math.abs((mx * a[1] - my * a[0]) / m); // along the incoming part, per km of reach
+    const inside = km * (a[0] * b[1] - a[1] * b[0]) > 0;
+    if (inside && slide > 1e-9) reach = Math.min(reach, Math.min(lengths[ia], lengths[ib]) / 2 / slide);
     return [p[0] + (mx / m) * reach, p[1] + (my / m) * reach];
   });
 }
