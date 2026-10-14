@@ -1,20 +1,27 @@
 import { useCallback, useEffect, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { SiteMap, located } from "@/components/SiteMap";
 import { loadData, type LoadError, type Records } from "@/lib/api";
+import { useModel } from "@/lib/useModel";
 import { text } from "@/text";
+import { MapView } from "@/views/MapView";
+import { QualityView } from "@/views/QualityView";
 
-type State = { records: Records } | { problem: LoadError } | null;
+type State = { records: Records; as: string } | { problem: LoadError } | null;
+type View = "map" | "quality";
 
 export default function App() {
   const [state, setState] = useState<State>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [view, setView] = useState<View>("map");
 
   // Reading again keeps what is on screen until the new records arrive, so the map does not blink.
+  // Records that turn out unchanged are kept as they are, so nothing is worked out again for them.
   const load = useCallback(() => {
     loadData().then(
-      (records) => setState({ records }),
+      (records) => {
+        const as = JSON.stringify(records);
+        setState((before) => (before && "records" in before && before.as === as ? before : { records, as }));
+      },
       (e) => setState({ problem: isLoadError(e) ? e : { kind: "other", message: String(e) } }),
     );
   }, []);
@@ -26,51 +33,34 @@ export default function App() {
     return () => window.removeEventListener("focus", load);
   }, [load]);
 
+  const records = state && "records" in state && state.records.sites.length > 0 ? state.records : null;
+  const model = useModel(records);
+
   return (
     <div className="flex h-screen flex-col">
-      <header className="flex items-center justify-between border-b px-4 py-2">
+      <header className="flex items-center gap-6 border-b px-4 py-2">
         <h1 className="text-base font-semibold">{text.appName}</h1>
-        <Button variant="outline" size="sm" onClick={load}><RefreshCw />{text.refresh}</Button>
-      </header>
-      <Body state={state} selectedId={selectedId} onSelect={setSelectedId} />
-    </div>
-  );
-}
-
-function Body({ state, selectedId, onSelect }: { state: State; selectedId: string | null; onSelect: (id: string | null) => void }) {
-  if (!state) return <Message>{text.loading}</Message>;
-  if ("problem" in state) {
-    const p = state.problem;
-    return <Message detail={p.kind === "other" ? p.message : undefined}>{text.problems[p.kind]}</Message>;
-  }
-  const { sites } = state.records;
-  if (sites.length === 0) return <Message>{text.empty}</Message>;
-
-  const shown = located(sites).length;
-  // A borewell deleted in StrataField since it was selected is simply no longer selected.
-  const selected = sites.find((s) => s.borewell.id === selectedId)?.borewell;
-  return (
-    <div className="flex min-h-0 flex-1">
-      <div className="min-w-0 flex-1"><SiteMap sites={sites} selectedId={selected?.id ?? null} onSelect={onSelect} /></div>
-      <aside className="w-80 shrink-0 space-y-4 overflow-y-auto border-l p-4 text-sm">
-        <div>
-          <p className="font-medium">{text.onMap(shown)}</p>
-          {sites.length > shown && <p className="text-muted-foreground">{text.notShown(sites.length - shown)}</p>}
-        </div>
-        {selected ? (
-          <div className="space-y-2 border-t pt-4">
-            <h2 className="text-base font-semibold">{selected.borewellId}</h2>
-            <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
-              <dt className="text-muted-foreground">{text.area}</dt><dd>{selected.area || text.notRecorded}</dd>
-              <dt className="text-muted-foreground">{text.depth}</dt><dd>{selected.totalDepth != null ? `${selected.totalDepth} ${selected.depthUnit}` : text.notRecorded}</dd>
-              <dt className="text-muted-foreground">{text.drilled}</dt><dd>{selected.date || text.notRecorded}</dd>
-            </dl>
-            <p className="text-muted-foreground">{text.openInStrataField}</p>
-          </div>
-        ) : (
-          <p className="border-t pt-4 text-muted-foreground">{text.selectHint}</p>
+        {records && (
+          <nav className="flex gap-1">
+            {(["map", "quality"] as const).map((v) => (
+              <Button key={v} variant={view === v ? "secondary" : "ghost"} size="sm" aria-current={view === v ? "page" : undefined} onClick={() => setView(v)}>
+                {text.tabs[v]}
+              </Button>
+            ))}
+          </nav>
         )}
-      </aside>
+        <Button variant="outline" size="sm" className="ml-auto" onClick={load}><RefreshCw />{text.refresh}</Button>
+      </header>
+      {!state ? <Message>{text.loading}</Message>
+        : "problem" in state ? <Message detail={state.problem.kind === "other" ? state.problem.message : undefined}>{text.problems[state.problem.kind]}</Message>
+        : !records ? <Message>{text.empty}</Message>
+        : (
+          <>
+            {/* The map stays mounted behind Data quality, so it keeps its place and the picked spot. */}
+            <div className={view === "map" ? "flex min-h-0 flex-1" : "hidden"}><MapView records={records} model={model} onHowGood={() => setView("quality")} /></div>
+            {view === "quality" && <QualityView model={model} />}
+          </>
+        )}
     </div>
   );
 }

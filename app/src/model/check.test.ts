@@ -18,7 +18,7 @@ describe("checkModel", () => {
     const r = check(town(4, 0.5));
     expect(r.canJudge).toBe(true);
     expect(r.compared).toBe(16);
-    expect(r.overall).toEqual({ steps: 320, right: 320 });
+    expect(r.overall).toEqual({ steps: 320, right: 320, borewells: 16 });
     expect(r.likely).toEqual(r.overall);
     expect(r.byDistance.under1).toEqual(r.overall);
     expect(r.oddOnesOut).toEqual([]);
@@ -54,7 +54,7 @@ describe("checkModel", () => {
     const far = east(1.5 + 4);
     const r = check([...town(4, 0.5), site("edge-deep", north(0), far, [[0, 30, "clay"], [30, 100, "kankar"]]), site("edge-shallow", north(0.03), far, [[0, 30, "clay"]])]);
     expect(r.oddOnesOut).toEqual([]);
-    expect(r.byDistance.under1).toEqual({ steps: 320, right: 320 });
+    expect(r.byDistance.under1).toEqual({ steps: 320, right: 320, borewells: 16 });
     expect(r.byDistance.over3.steps).toBeGreaterThan(0);
     expect(r.byDistance.over3.right).toBeLessThan(r.byDistance.over3.steps);
   });
@@ -73,7 +73,7 @@ describe("checkModel", () => {
     const r = check(Array.from({ length: 12 }, (_, i) => site(`far${i}`, north((Math.floor(i / 4) - 1) * 6), east(((i % 4) - 1.5) * 6), CLAY_OVER_SAND)));
     expect(r.compared).toBe(0);
     expect(r.canJudge).toBe(false);
-    expect(r.overall).toEqual({ steps: 0, right: 0 });
+    expect(r.overall).toEqual({ steps: 0, right: 0, borewells: 0 });
     expect(share(r.overall)).toBeNull();
     expect(r.oddOnesOut).toEqual([]);
   });
@@ -82,12 +82,12 @@ describe("checkModel", () => {
     // Three pairs, far from each other; the borewells of a pair are 0.5, 2 and 4 km apart.
     const pair = (name: string, y: number, gap: number) => [site(`${name}a`, north(y), east(-10), CLAY_OVER_SAND), site(`${name}b`, north(y), east(-10 + gap), CLAY_OVER_SAND)];
     const r = check([...pair("near", -12, 0.5), ...pair("mid", 0, 2), ...pair("far", 12, 4)]);
-    const both = { steps: 40, right: 40 };
+    const both = { steps: 40, right: 40, borewells: 2 };
     expect(r.byDistance).toEqual({ under1: both, from1to3: both, over3: both });
     // One borewell is one site, which the model never shows as an estimate; the check still scores it,
     // but keeps it out of the headline.
-    expect(r.none).toEqual({ steps: 120, right: 120 });
-    expect(r.overall).toEqual({ steps: 0, right: 0 });
+    expect(r.none).toEqual({ steps: 120, right: 120, borewells: 6 });
+    expect(r.overall).toEqual({ steps: 0, right: 0, borewells: 0 });
   });
 
   it("compares by height, using the hidden borewell's own ground", () => {

@@ -304,23 +304,62 @@ mod tests {
         );
         let (db, _) = Database::open(&dir).unwrap();
         db.with_tx(|tx| {
-            // A 5 by 5 grid across Lucknow (the middle one is at the city centre), plus two
-            // borewells whose location was never recorded.
-            for i in 0..27 {
-                let located = i < 25;
-                repo::create_with_layers(
+            // A 5 by 5 grid about 1 km apart (the middle one is at the city centre), two borewells
+            // whose location was never recorded, and one more at exactly the same spot as the
+            // middle one. Number 8 is logged upside down, so there is one that does not fit its
+            // surroundings.
+            for i in 0..28 {
+                let located = i < 25 || i == 27;
+                let at = if i == 27 { 12 } else { i };
+                let clay_to = 40.0 + 5.0 * (i % 5) as f64;
+                let mut soils = vec![
+                    ("Clay", "clay", 0.0, clay_to),
+                    ("Sand", "medium_sand", clay_to, 120.0),
+                    ("Fine Sand", "fine_sand", 120.0, 160.0),
+                    ("Kankar", "kankar", 160.0, 200.0),
+                ];
+                if i == 7 {
+                    soils = vec![
+                        ("Kankar", "kankar", 0.0, 40.0),
+                        ("Fine Sand", "fine_sand", 40.0, 80.0),
+                        ("Sand", "medium_sand", 80.0, 200.0 - clay_to),
+                        ("Clay", "clay", 200.0 - clay_to, 200.0),
+                    ];
+                }
+                let strata: Vec<StrataLayer> = soils
+                    .into_iter()
+                    .map(|(material, id, start_depth, end_depth)| StrataLayer {
+                        start_depth,
+                        end_depth,
+                        material: material.into(),
+                        material_id: Some(id.into()),
+                        ..Default::default()
+                    })
+                    .collect();
+                let b = repo::create_with_layers(
                     tx,
                     &BorewellInput {
                         borewell_id: format!("BW-{:03}", i + 1),
                         area: "Made-up area".into(),
-                        latitude: located.then_some(26.75 + 0.05 * (i / 5) as f64),
-                        longitude: located.then_some(80.85 + 0.05 * (i % 5) as f64),
-                        total_depth: Some(200.0 + 10.0 * i as f64),
+                        latitude: located.then_some(26.83 + 0.01 * (at / 5) as f64),
+                        longitude: located.then_some(80.93 + 0.01 * (at % 5) as f64),
+                        total_depth: Some(200.0),
                         ..Default::default()
                     },
-                    &[],
+                    if located { &strata } else { &[] },
                     &[],
                 )?;
+                if located {
+                    repo::layers::add_water_reading(
+                        tx,
+                        &b.id,
+                        &WaterReading {
+                            measured_on: format!("2026-0{}-15", 1 + i % 9),
+                            static_level: Some(50.0 + 2.0 * (i % 7) as f64),
+                            ..Default::default()
+                        },
+                    )?;
+                }
             }
             Ok(())
         })
