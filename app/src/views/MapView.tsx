@@ -94,9 +94,11 @@ function Proposed({ spot, model, sites, borewells, onHowGood }: { spot: [number,
   const waterLine = <p>{water ? text.waterExpected(Math.round(water.feet), distanceInWords(water.nearestKm), water.since) : text.noWater}</p>;
   if (model === "failed") return <>{heading}<p>{text.groundFailed}</p></>;
   if (!ready) return <>{heading}<p className="text-muted-foreground">{text.readingGround}</p></>;
+  // With no layers to propose, what was done nearby is still worth seeing.
+  const doneNearby = nearby.length > 0 && <Drilling s={suggestDrilling(column ?? [], water, nearby)!} />;
   // Outside the ground-height data nothing can be placed by height, whatever borewells are near.
-  if (!column) return <>{heading}<p>{text.noGroundHere}</p>{waterLine}{howGood}</>;
-  if (!column.some((s) => s.likely)) return <>{heading}<p>{text.notEnoughHere}</p>{waterLine}{howGood}</>;
+  if (!column) return <>{heading}<p>{text.noGroundHere}</p>{waterLine}{doneNearby}{howGood}</>;
+  if (!column.some((s) => s.likely)) return <>{heading}<p>{text.notEnoughHere}</p>{waterLine}{doneNearby}{howGood}</>;
 
   // Only the borewells behind what is actually proposed, not those behind stretches left empty.
   const behind = new Map<string, number>();
@@ -165,10 +167,10 @@ function Drilling({ s }: { s: Suggestion }) {
         <>
           <p>{t.water(ft(s.proposal.waterFt))}</p>
           <ul>{s.proposal.slotted.map((p) => <li key={p.top}>{t.slotted(ft(p.top), ft(p.bottom), text.levels[p.level])}</li>)}</ul>
-          <p className="font-medium">{t.drillTo(ft(s.proposal.drillToFt))}</p>
-          <p className="text-muted-foreground">{t.drillToNote}</p>
+          <p className="font-medium">{t.drillTo(ft(s.proposal.drillToFt), s.proposal.slotted[s.proposal.slotted.length - 1].level === "rough")}</p>
+          <p className="text-muted-foreground">{t.drillToNote[s.proposal.limit]}</p>
         </>
-      ) : <p>{s.noProposal === "noWater" ? t.noWater : t.noWaterBearing}</p>}
+      ) : <p>{t[s.noProposal ?? "noWaterBearing"]}</p>}
     </section>
   );
 }

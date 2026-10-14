@@ -35,6 +35,12 @@ describe("nearbyWells", () => {
     expect(w.slotted[0]).toMatchObject({ top: 80, bottom: 100 });
   });
 
+  it("does not draw the pipe of a borewell whose ground height is unknown", () => {
+    // Outside the ground-height data and with no height of its own: its pipe cannot be put at the same height.
+    const [w] = nearbyWells(26.6005, 80.95, [well("edge", 26.599, 80.95, { totalDepth: 200 }, [pipe(100, 120)])], flat);
+    expect(w).toMatchObject({ drilledFt: 200, slotted: [] });
+  });
+
   it("leaves out what was not recorded", () => {
     const [w] = near([well("bare", north(0), east(0.5), { totalDepth: null, pumpLowering: null })]);
     expect(w).toMatchObject({ drilledFt: null, pumpFt: null, slotted: [] });
@@ -106,6 +112,29 @@ describe("suggestDrilling", () => {
     expect(s.drilled).toEqual({ low: 200, middle: 250, high: 300 });
     expect(s.pump).toEqual({ low: 100, middle: 110, high: 120 });
     expect(suggestDrilling(COLUMN, water(50), [nb(null, null)])!).toMatchObject({ drilled: null, pump: null });
+  });
+
+  it("never suggests slotted pipe below the depth it suggests drilling to", () => {
+    // Nearby borewells went to 110 ft: the stretch at 120–160 cannot be reached.
+    const s = suggestDrilling(COLUMN, water(50), [nb(110)])!;
+    expect(s.proposal).toEqual({ waterFt: 50, slotted: [{ top: 50, bottom: 80, level: "likely" }], drillToFt: 80, limit: "deepestNearby" });
+  });
+
+  it("cuts a stretch where the depth limit falls inside it, and drops it under 10 ft", () => {
+    expect(suggestDrilling(COLUMN, water(50), [nb(145)])!.proposal!.slotted).toEqual([
+      { top: 50, bottom: 80, level: "likely" }, { top: 120, bottom: 145, level: "rough" },
+    ]);
+    expect(suggestDrilling(COLUMN, water(50), [nb(125)])!.proposal!.slotted).toEqual([{ top: 50, bottom: 80, level: "likely" }]);
+  });
+
+  it("proposes nothing when every borewell nearby is shallower than the water-bearing sand", () => {
+    const s = suggestDrilling(COLUMN, water(50), [nb(40), nb(35)])!;
+    expect(s.proposal).toBeNull();
+    expect(s.noProposal).toBe("nearbyShallower");
+  });
+
+  it("says when no borewell nearby records its depth, instead of claiming a limit", () => {
+    expect(suggestDrilling(COLUMN, water(50), [nb(null)])!.proposal).toMatchObject({ drillToFt: 160, limit: "noneKnown" });
   });
 
   it("has no suggestion with nobody nearby", () => {

@@ -39,9 +39,18 @@ export interface Suggestion {
   nearby: NearbyWell[];
   drilled: Spread | null;
   pump: Spread | null;
-  proposal: { waterFt: number; slotted: (Span & { level: "likely" | "rough" })[]; drillToFt: number } | null;
-  /** Why nothing is proposed: no expected water level, or no water-bearing stretch to put slotted pipe in. */
-  noProposal: "noWater" | "noWaterBearing" | null;
+  proposal: {
+    waterFt: number;
+    slotted: (Span & { level: "likely" | "rough" })[];
+    drillToFt: number;
+    /** Whether the depth was held to the deepest borewell nearby, or none nearby records its depth. */
+    limit: "deepestNearby" | "noneKnown";
+  } | null;
+  /**
+   * Why nothing is proposed: no expected water level; no water-bearing stretch to put slotted pipe
+   * in; or every borewell nearby stopped above it.
+   */
+  noProposal: "noWater" | "noWaterBearing" | "nearbyShallower" | null;
 }
 
 /** How many sites count as "nearby", and the thinnest water-bearing stretch worth slotted pipe. */
@@ -75,14 +84,15 @@ export function nearbyWells(latitude: number, longitude: number, sites: SiteWith
 
   return chosen.map(({ s: { borewell: b, pipes }, km }) => {
     const own = groundFt(grid, b);
-    // Its depths become the spot's depths at the same height; on unknown ground they are left as they are.
-    const shift = here != null && own != null ? here * METRES_TO_FEET - own : 0;
+    // Its depths become the spot's depths at the same height. Where either ground height is unknown
+    // that cannot be done, so its pipe is not drawn at all rather than drawn at the wrong height.
+    const shift = here != null && own != null ? here * METRES_TO_FEET - own : null;
     return {
       id: b.id, borewellId: b.borewellId, km,
       // Only the total depth follows an old record's unit; pipes and the pump are always feet.
       drilledFt: b.totalDepth != null ? b.totalDepth * (b.depthUnit === "m" ? METRES_TO_FEET : 1) : null,
       pumpFt: b.pumpLowering ?? null,
-      slotted: pipes
+      slotted: shift == null ? [] : pipes
         .filter((p) => p.pipeType === "slotted" && p.endDepth > p.startDepth)
         .map((p) => ({ top: p.startDepth + shift, bottom: p.endDepth + shift }))
         .filter((p) => p.bottom > 0)
@@ -136,6 +146,15 @@ export function suggestDrilling(column: readonly Step[], water: WaterHere | null
   close();
 
   if (slotted.length === 0) return { ...base, proposal: null, noProposal: "noWaterBearing" };
-  const deepest = base.drilled?.high ?? Infinity;
-  return { ...base, proposal: { waterFt: water.feet, slotted, drillToFt: Math.min(slotted[slotted.length - 1].bottom, deepest) }, noProposal: null };
+  // Never deeper than the deepest borewell nearby, and so never slotted pipe below that either.
+  const deepest = base.drilled?.high ?? null;
+  const reachable = slotted
+    .map((p) => ({ ...p, bottom: deepest == null ? p.bottom : Math.min(p.bottom, deepest) }))
+    .filter((p) => p.bottom - p.top >= MIN_SLOTTED_FT);
+  if (reachable.length === 0) return { ...base, proposal: null, noProposal: "nearbyShallower" };
+  return {
+    ...base,
+    proposal: { waterFt: water.feet, slotted: reachable, drillToFt: reachable[reachable.length - 1].bottom, limit: deepest == null ? "noneKnown" : "deepestNearby" },
+    noProposal: null,
+  };
 }
