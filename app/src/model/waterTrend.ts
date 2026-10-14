@@ -25,25 +25,32 @@ export interface Trend {
 const NEAR_KM = 2;
 /** Distances closer than this count as this, so one borewell on the square does not count without limit. */
 const CLOSEST_KM = 0.1;
-const AREA = { readings: 5, years: 2 };
+/**
+ * The area trend compares different wells, which differ by far more than a few years' change; with
+ * few readings it would mostly show that difference as a strong trend. So it needs many.
+ */
+const AREA = { readings: 15, years: 2 };
 
 const yearOf = (iso: string) => {
-  const d = new Date(`${iso.slice(0, 10)}T00:00:00Z`);
+  const d = new Date(`${iso.trim().slice(0, 10)}T00:00:00Z`);
   const y = d.getUTCFullYear();
   return Number.isNaN(y) ? null : y + (d.getTime() - Date.UTC(y, 0, 1)) / (365.25 * 86_400_000);
 };
 
-/** Every dated water level of located borewells: their readings, or their own level when they have none. */
+/**
+ * Every dated water level of located borewells: their readings with the level at rest, and their own
+ * level too unless a reading of that day already gives it (it is usually the newest reading's).
+ */
 export function readingsOf(sites: { borewell: Borewell; waterReadings: WaterReading[] }[]): Reading[] {
   const out: Reading[] = [];
   for (const { borewell: b, waterReadings } of sites) {
     if (b.latitude == null || b.longitude == null) continue;
-    const dated = waterReadings.length
-      ? waterReadings.map((r) => [r.measuredOn, r.staticLevel] as const)
-      : [[b.waterLevelOn, b.waterLevel] as const];
+    const dated = waterReadings.filter((r) => r.staticLevel != null).map((r) => [r.measuredOn, r.staticLevel!] as const);
+    const day = (on: string) => on.trim().slice(0, 10);
+    if (b.waterLevelOn && b.waterLevel != null && !dated.some(([on]) => day(on) === day(b.waterLevelOn!))) dated.push([b.waterLevelOn, b.waterLevel]);
     for (const [on, feet] of dated) {
-      const year = on ? yearOf(on) : null;
-      if (year != null && feet != null) out.push({ id: b.id, latitude: b.latitude, longitude: b.longitude, year, feet });
+      const year = yearOf(on);
+      if (year != null) out.push({ id: b.id, latitude: b.latitude, longitude: b.longitude, year, feet });
     }
   }
   return out;

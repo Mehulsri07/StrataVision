@@ -21,8 +21,22 @@ describe("readingsOf", () => {
       site(bw("b", 1, 60, "2024-07-01")),
       site(bw("c", 2, 70, null)),
     ]);
-    expect(r.map((x) => [x.id, x.feet])).toEqual([["a", 40], ["a", 44], ["b", 60]]);
+    expect(r.map((x) => [x.id, x.feet])).toEqual([["a", 40], ["a", 44], ["a", 50], ["b", 60]]);
     expect(r[0].year).toBeCloseTo(2023, 2);
+  });
+
+  it("keeps a borewell's own level when its readings only have the level with the pump running", () => {
+    const r = readingsOf([site(bw("a", 0, 50, "2023-06-01"), [{ measuredOn: "2026-01-01", staticLevel: null, dynamicLevel: 80 } as WaterReading])]);
+    expect(r.map((x) => x.feet)).toEqual([50]);
+  });
+
+  it("does not count the newest reading twice", () => {
+    const r = readingsOf([site(bw("a", 0, 44, "2025-01-01"), [reading("2023-01-01", 40), reading("2025-01-01", 44)])]);
+    expect(r).toHaveLength(2);
+  });
+
+  it("reads dates with spaces around them", () => {
+    expect(readingsOf([site(bw("a", 0, 50, " 2024-01-01 "))])).toHaveLength(1);
   });
 });
 
@@ -45,14 +59,15 @@ describe("trendAt", () => {
   });
 
   it("otherwise uses different borewells over the years, if there are enough", () => {
-    const readings = readingsOf(Array.from({ length: 5 }, (_, i) => site(bw(`o${i}`, 0.3 * i, 40 + i, `${2021 + i}-01-01`))));
+    const readings = readingsOf(Array.from({ length: 15 }, (_, i) => site(bw(`o${i}`, 0.1 * i, 40 + (i % 5), `${2021 + (i % 5)}-01-01`))));
     expect(trendAt(CENTRE[0], CENTRE[1], readings, [])).toMatchObject({ from: "area", ftPerYear: expect.closeTo(1, 3) });
   });
 
-  it("says nothing with fewer than 5 readings or under 2 years", () => {
-    const four = readingsOf(Array.from({ length: 4 }, (_, i) => site(bw(`o${i}`, 0.3 * i, 40 + i, `${2021 + i}-01-01`))));
-    expect(trendAt(CENTRE[0], CENTRE[1], four, [])).toBeNull();
-    const oneYear = readingsOf(Array.from({ length: 6 }, (_, i) => site(bw(`o${i}`, 0.3 * i, 40 + i, `2024-0${i + 1}-01`))));
+  it("says nothing with fewer than 15 readings or under 2 years", () => {
+    // Different wells differ by far more than a few years' change, so a handful of them says nothing.
+    const few = readingsOf(Array.from({ length: 14 }, (_, i) => site(bw(`o${i}`, 0.1 * i, 40 + i, `${2021 + (i % 5)}-01-01`))));
+    expect(trendAt(CENTRE[0], CENTRE[1], few, [])).toBeNull();
+    const oneYear = readingsOf(Array.from({ length: 16 }, (_, i) => site(bw(`o${i}`, 0.1 * i, 40 + i, `2024-0${1 + (i % 9)}-01`))));
     expect(trendAt(CENTRE[0], CENTRE[1], oneYear, [])).toBeNull();
   });
 

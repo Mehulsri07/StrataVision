@@ -57,8 +57,9 @@ export function CityView({ records, model, onHowGood }: { records: Records; mode
 
   const map = grid && grid !== "empty" ? grid : null;
   const deepestFt = useMemo(() => (map ? Math.max(STEP_FT, ...map.points.map((p) => (p?.codes.length ?? 0) * STEP_FT)) : STEP_FT), [map]);
-  // Water-bearing sand is added up over at least one step.
-  const depth = Math.max(mode === "thick" ? STEP_FT : 0, Math.min(depthFt, deepestFt - STEP_FT));
+  // "Ground" and "thin" read the step at the depth; "thick" adds up the steps above it, at least one.
+  const [minDepth, maxDepth] = mode === "thick" ? [STEP_FT, deepestFt] : [0, deepestFt - STEP_FT];
+  const depth = Math.max(minDepth, Math.min(depthFt, maxDepth));
   const bounds = useMemo(() => (map ? ([[map.south, map.west], [map.north, map.east]] as [[number, number], [number, number]]) : null), [map]);
   const picture = useMemo(() => {
     if (!map) return null;
@@ -95,7 +96,7 @@ export function CityView({ records, model, onHowGood }: { records: Records; mode
         {AT_DEPTH.has(mode) && map && (
           <label className="block space-y-1">
             <span>{t.depth(depth)}</span>
-            <input type="range" className="w-full" min={mode === "thick" ? STEP_FT : 0} max={deepestFt - STEP_FT} step={STEP_FT} value={depth} onChange={(e) => setDepthFt(Number(e.target.value))} />
+            <input type="range" className="w-full" min={minDepth} max={maxDepth} step={STEP_FT} value={depth} onChange={(e) => setDepthFt(Number(e.target.value))} />
           </label>
         )}
         {model === "failed" ? <p>{text.groundFailed}</p>
@@ -126,7 +127,9 @@ function Key({ mode }: { mode: CityMode }) {
           <div className="h-3 rounded-sm" aria-hidden="true" style={{ background: `linear-gradient(to right, ${RAMPS[mode].map(([, c]) => `rgb(${c.join(",")})`).join(",")})` }} />
           <div className="flex justify-between text-muted-foreground">
             {/* The last stop also stands for anything past it; a change per year shows its sign. */}
-            {RAMPS[mode].map(([f], i, all) => <span key={f}>{mode === "trend" && f > 0 ? "+" : ""}{f}{mode !== "trend" && i === all.length - 1 ? "+" : ""}</span>)}
+            {RAMPS[mode].map(([f], i, all) => (
+              <span key={f}>{mode === "trend" && i === 0 ? "≤" : ""}{mode === "trend" && f > 0 ? "+" : ""}{f}{i === all.length - 1 ? (mode === "trend" ? " or more" : "+") : ""}</span>
+            ))}
           </div>
           <p>{t.rampKey[mode]}</p>
         </li>

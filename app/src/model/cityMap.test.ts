@@ -87,6 +87,7 @@ describe("paint", () => {
     expect(thickness(Uint8Array.from(codes), 10)).toEqual({ feet: 5, rough: false });
     expect(thickness(Uint8Array.from(codes), 30)).toBeNull(); // the column ends before 30 ft
     expect(thickness(Uint8Array.from([0, 0, 0, 5]), 20)).toBeNull(); // mostly not enough data
+    expect(thickness(Uint8Array.from([1, 0, 1, 1]), 20)).toEqual({ feet: 0, rough: true }); // a gap could hide sand
     expect([...paint(grid(codes), "thick", 10)]).toEqual([...ramp(THICK_RAMP, 5), 200]);
     expect(paint(grid(codes), "thick", 20)[3]).toBe(90);
   });

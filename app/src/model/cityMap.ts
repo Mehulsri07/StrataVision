@@ -111,7 +111,8 @@ export function thickness(codes: Uint8Array, depthFt: number) {
       rough ||= ((code - 1) & 1) === 1;
     }
   }
-  return unknown * 2 > steps ? null : { feet: wet * STEP_FT, rough };
+  // A gap in the proposal could hide sand, so the total is then only a rough guess.
+  return unknown * 2 > steps ? null : { feet: wet * STEP_FT, rough: rough || unknown > 0 };
 }
 const THIN_RGB = [13, 104, 131];
 

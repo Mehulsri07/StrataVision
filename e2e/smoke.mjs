@@ -132,7 +132,7 @@ const scenarios = {
         await expectScreen("Each square is about");
         await expectScreen("Depth: 50 ft below ground");
         await js("[...document.querySelectorAll('label')].find((l) => l.innerText.trim() === 'How fast the water level is changing').click()");
-        await expectScreen("water levels measured a year or more apart");
+        await expectScreen("10 borewells have water levels measured a year or more apart"); // every third made-up one
       });
     } finally {
       rmSync(dataDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 500 }); // the app may still be letting go

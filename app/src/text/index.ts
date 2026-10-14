@@ -128,7 +128,7 @@ export const text = {
     },
     depth: (feet: number) => `Depth: ${feet} ft below ground`,
     working: (percent: number) => `Working out the map… ${percent}%`,
-    rampKey: { wet: "Feet below ground", thick: "Feet of water-bearing sand", trend: "Feet a year: blue rising, red falling" },
+    rampKey: { wet: "Feet below ground", thick: "Feet of water-bearing sand", trend: "Feet a year deeper (+) or shallower (−): red where the water is falling, blue where it is rising" },
     strongTrend: "Strong: measured more than once at the same borewells",
     palerTrend: "Paler: from different borewells measured in different years nearby (a rough guess)",
     repeat: (n: number) =>
@@ -139,7 +139,7 @@ export const text = {
       wet: "Clear: no such sand proposed, or not enough data",
       thick: "Clear: not enough data down to this depth",
       thin: "Clear: not enough data at this depth",
-      trend: "Clear: too few dated water levels within 2 km (at least 5, over 2 years or more)",
+      trend: "Clear: too few dated water levels within 2 km (at least 15, over 2 years or more)",
     },
     squares: (metres: number) => `Each square is about ${metres} m across.`,
     empty: "There are no borewells with a location and layers to map yet.",
