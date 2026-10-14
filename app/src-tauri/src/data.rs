@@ -383,6 +383,18 @@ mod tests {
                             ..Default::default()
                         },
                     )?;
+                    // Every third one was also read three years earlier, 6 ft higher: a falling water level.
+                    if i % 3 == 0 {
+                        repo::layers::add_water_reading(
+                            tx,
+                            &b.id,
+                            &WaterReading {
+                                measured_on: format!("2023-0{}-15", 1 + i % 9),
+                                static_level: Some(44.0 + 2.0 * (i % 7) as f64),
+                                ..Default::default()
+                            },
+                        )?;
+                    }
                 }
             }
             Ok(())

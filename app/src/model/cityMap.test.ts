@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_MATERIALS } from "@strata/core";
-import { cityArea, cityPoint, paint, type CityGrid } from "./cityMap";
+import { THICK_RAMP, TREND_RAMP, cityArea, cityPoint, paint, ramp, thickness, type CityGrid } from "./cityMap";
+import type { Trend } from "./waterTrend";
 import { prepare, type ModelSite } from "./model";
 import { CENTRE, east, flatGrid, north, site } from "./testGround";
 
@@ -59,8 +60,8 @@ describe("cityArea", () => {
 });
 
 describe("paint", () => {
-  const grid = (codes: number[], firstWet: { top: number; level: "likely" | "rough" } | null = null): CityGrid =>
-    ({ south: 0, west: 0, north: 1, east: 1, cols: 1, rows: 1, points: [{ codes: Uint8Array.from(codes), firstWet }] });
+  const grid = (codes: number[], firstWet: { top: number; level: "likely" | "rough" } | null = null, trend: Trend | null = null): CityGrid =>
+    ({ south: 0, west: 0, north: 1, east: 1, cols: 1, rows: 1, points: [{ codes: Uint8Array.from(codes), firstWet }], trends: [trend] });
 
   it("colours the ground at a depth, paler where it is a rough guess, and leaves gaps empty", () => {
     expect([...paint(grid([1, 2, 0]), "ground", 0)]).toEqual([0xa0, 0x78, 0x5a, 200]);
@@ -77,5 +78,22 @@ describe("paint", () => {
   it("shows how sure it is alone, where data is thin", () => {
     expect(paint(grid([5]), "thin", 0)[3]).toBe(200);
     expect(paint(grid([6]), "thin", 0)[3]).toBe(90);
+  });
+
+  it("adds up the water-bearing sand down to a depth", () => {
+    // Clay, two steps of water-bearing sand (one a rough guess), clay, water-bearing sand.
+    const codes = [1, 5, 6, 1, 5];
+    expect(thickness(Uint8Array.from(codes), 20)).toEqual({ feet: 10, rough: true });
+    expect(thickness(Uint8Array.from(codes), 10)).toEqual({ feet: 5, rough: false });
+    expect(thickness(Uint8Array.from(codes), 30)).toBeNull(); // the column ends before 30 ft
+    expect(thickness(Uint8Array.from([0, 0, 0, 5]), 20)).toBeNull(); // mostly not enough data
+    expect([...paint(grid(codes), "thick", 10)]).toEqual([...ramp(THICK_RAMP, 5), 200]);
+    expect(paint(grid(codes), "thick", 20)[3]).toBe(90);
+  });
+
+  it("colours how fast the water level changes, pale where it is from different borewells", () => {
+    expect([...paint(grid([], null, { ftPerYear: 2, from: "same" }), "trend", 0)]).toEqual([...ramp(TREND_RAMP, 2), 200]);
+    expect(paint(grid([], null, { ftPerYear: 2, from: "area" }), "trend", 0)[3]).toBe(90);
+    expect(paint(grid([], null, null), "trend", 0)[3]).toBe(0);
   });
 });
