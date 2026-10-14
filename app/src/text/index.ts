@@ -115,20 +115,31 @@ export const text = {
 
   city: {
     modeLabel: "What the map shows",
-    modes: { ground: "Ground at a depth", wet: "Depth to water-bearing sand", thin: "Where data is thin" },
+    modes: {
+      ground: "Ground at a depth", wet: "Depth to water-bearing sand", thick: "Water-bearing sand down to a depth",
+      thin: "Where data is thin", trend: "How fast the water level is changing",
+    },
     about: {
       ground: "What the ground is most likely made of at the chosen depth below ground.",
       wet: "How deep the first water-bearing sand at least 10 ft thick is likely to be.",
+      thick: "How many feet of water-bearing sand are likely between the surface and the chosen depth.",
       thin: "How sure the proposals are at the chosen depth, on their own, so the gaps in the records stand out.",
+      trend: "How many feet a year the water level is getting deeper (falling) or shallower (rising), from water levels measured within 2 km.",
     },
     depth: (feet: number) => `Depth: ${feet} ft below ground`,
     working: (percent: number) => `Working out the map… ${percent}%`,
-    wetKey: "Feet below ground",
+    rampKey: { wet: "Feet below ground", thick: "Feet of water-bearing sand", trend: "Feet a year deeper (+) or shallower (−): red where the water is falling, blue where it is rising" },
+    strongTrend: "Strong: measured more than once at the same borewells",
+    palerTrend: "Paler: from different borewells measured in different years nearby (a rough guess)",
+    repeat: (n: number) =>
+      `${n === 1 ? "1 borewell has" : `${n} borewells have`} water levels measured a year or more apart. The map firms up as more repeat readings are added in StrataField.`,
     paler: "Paler: a rough guess",
     clear: {
       ground: "Clear: not enough data at this depth",
       wet: "Clear: no such sand proposed, or not enough data",
+      thick: "Clear: not enough data down to this depth",
       thin: "Clear: not enough data at this depth",
+      trend: "Clear: too few dated water levels within 2 km (at least 15, over 2 years or more)",
     },
     squares: (metres: number) => `Each square is about ${metres} m across.`,
     empty: "There are no borewells with a location and layers to map yet.",
