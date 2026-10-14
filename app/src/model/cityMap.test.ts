@@ -32,9 +32,29 @@ describe("cityPoint", () => {
 
 describe("cityArea", () => {
   it("covers the borewells with 2 km to spare", () => {
-    const area = cityArea(prepare(around([[0, 100, "clay"]]), DEFAULT_MATERIALS, flat))!;
+    const area = cityArea(prepare(around([[0, 100, "clay"]]), DEFAULT_MATERIALS, flat), flat)!;
     expect(area.north).toBeCloseTo(north(0.5 + 2), 3);
     expect(area.west).toBeCloseTo(east(-0.35 - 2), 3);
+  });
+
+  it("stays within the ground-height data, however far off a borewell is", () => {
+    // A borewell 80 km away with its own recorded height still votes, but the map stays on the city.
+    const sites = [...around([[0, 100, "clay"]]), site("far", 27.6, 81.7, [[0, 100, "clay"]], { groundElevationM: 120 })];
+    const area = cityArea(prepare(sites, DEFAULT_MATERIALS, flat), flat)!;
+    expect(area.north).toBeLessThanOrEqual(flat.north);
+    expect(area.east).toBeLessThanOrEqual(flat.east);
+  });
+
+  it("has about 10,000 square cells", () => {
+    const area = cityArea(prepare(around([[0, 100, "clay"]]), DEFAULT_MATERIALS, flat), flat)!;
+    const w = (area.east - area.west) * 111.32 * Math.cos((CENTRE[0] * Math.PI) / 180) / area.cols, h = (area.north - area.south) * 110.57 / area.rows;
+    expect(w / h).toBeCloseTo(1, 1);
+    expect(area.cols * area.rows).toBeGreaterThan(9500);
+    expect(area.cols * area.rows).toBeLessThanOrEqual(10000);
+  });
+
+  it("is null with no borewell that can vote", () => {
+    expect(cityArea([], flat)).toBeNull();
   });
 });
 

@@ -5,13 +5,14 @@
  */
 import { GROUPS } from "./groups";
 import { STEP_FT } from "./constants";
+import type { ElevationGrid } from "@strata/core";
 import { predictColumn, type Prepared } from "./model";
 import { GROUP_COLOUR } from "./words";
 
 export interface CityPoint {
   /** One per step from the surface: 0 where nothing is proposed, else 1 + group index × 2, + 1 for a rough guess. */
   codes: Uint8Array;
-  /** The top of the first water-bearing sand at least 10 ft thick, and the weaker level of its steps. */
+  /** The top of the first water-bearing sand at least 10 ft thick, and the weaker level of its first 10 ft. */
   firstWet: { top: number; level: "likely" | "rough" } | null;
 }
 
@@ -32,8 +33,10 @@ export type CityMode = "ground" | "wet" | "thin";
 const MIN_WET_FT = 10;
 /** How far past the outermost borewells the map goes. */
 const MARGIN_KM = 2;
+/** About how many points the map is worked out at. */
+const POINTS = 10_000;
 
-export function cityPoint(latitude: number, longitude: number, prepared: Prepared[], grid: Parameters<typeof predictColumn>[3]): CityPoint | null {
+export function cityPoint(latitude: number, longitude: number, prepared: Prepared[], grid: ElevationGrid): CityPoint | null {
   const column = predictColumn(latitude, longitude, prepared, grid);
   if (!column) return null;
   const codes = new Uint8Array(column.length);
@@ -49,13 +52,22 @@ export function cityPoint(latitude: number, longitude: number, prepared: Prepare
   return { codes, firstWet };
 }
 
-/** The borewells' extent with room around it; null with no borewells. */
-export function cityArea(prepared: Prepared[]) {
+/**
+ * The borewells' extent with room around it, kept within the ground-height data (nothing can be
+ * proposed outside it, and one far-off borewell must not stretch the map), and split into about
+ * 10,000 square cells. Null with no borewell, or none within the data.
+ */
+export function cityArea(prepared: Prepared[], grid: ElevationGrid) {
   if (!prepared.length) return null;
   const lats = prepared.map((p) => p.latitude), lons = prepared.map((p) => p.longitude);
-  const [south, north] = [Math.min(...lats), Math.max(...lats)];
-  const dLat = MARGIN_KM / 110.57, dLon = MARGIN_KM / (111.32 * Math.cos((((south + north) / 2) * Math.PI) / 180));
-  return { south: south - dLat, north: north + dLat, west: Math.min(...lons) - dLon, east: Math.max(...lons) + dLon };
+  const kx = 111.32 * Math.cos((((Math.min(...lats) + Math.max(...lats)) / 2) * Math.PI) / 180);
+  const dLat = MARGIN_KM / 110.57, dLon = MARGIN_KM / kx;
+  const south = Math.max(grid.south, Math.min(...lats) - dLat), north = Math.min(grid.north, Math.max(...lats) + dLat);
+  const west = Math.max(grid.west, Math.min(...lons) - dLon), east = Math.min(grid.east, Math.max(...lons) + dLon);
+  if (south >= north || west >= east) return null;
+  const aspect = ((east - west) * kx) / ((north - south) * 110.57);
+  const cols = Math.max(1, Math.round(Math.sqrt(POINTS * aspect)));
+  return { south, north, west, east, cols, rows: Math.max(1, Math.floor(POINTS / cols)) };
 }
 
 const rgb = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));

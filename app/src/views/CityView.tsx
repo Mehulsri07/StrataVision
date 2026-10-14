@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { ImageOverlay } from "react-leaflet";
+import { ImageOverlay, Pane } from "react-leaflet";
 import { kmBetween } from "@strata/core";
-import { Button } from "@/components/ui/button";
 import { SiteMap } from "@/components/SiteMap";
 import type { Records } from "@/lib/api";
 import type { Model } from "@/lib/useModel";
@@ -11,13 +10,10 @@ import { GROUPS } from "@/model/groups";
 import { GROUP_COLOUR, GROUP_NAME } from "@/model/words";
 import { text } from "@/text";
 
-/** Points along each side of the map. */
-const N = 100;
-
 /** The model painted over the whole city, in one of three modes. */
 export function CityView({ records, model, onHowGood }: { records: Records; model: Model | "failed" | null; onHowGood: () => void }) {
   const ready = model && model !== "failed" ? model : null;
-  const [grid, setGrid] = useState<CityGrid | null>(null);
+  const [grid, setGrid] = useState<CityGrid | "empty" | null>(null);
   const [progress, setProgress] = useState(0);
   const [mode, setMode] = useState<CityMode>("ground");
   const [depthFt, setDepthFt] = useState(50);
@@ -28,65 +24,74 @@ export function CityView({ records, model, onHowGood }: { records: Records; mode
   const prepared = ready?.prepared, ground = ready?.grid;
   useEffect(() => {
     if (!prepared || !ground) return;
-    const area = cityArea(prepared);
-    if (!area) return;
+    const area = cityArea(prepared, ground);
     const points: CityGrid["points"] = [];
     let row = 0, timer = 0;
     const work = () => {
+      // Nothing to map: said at once, and an old map is not left looking current.
+      if (!area) return setGrid("empty");
       const until = performance.now() + 30;
-      while (row < N && performance.now() < until) {
-        const lat = area.north - ((row + 0.5) * (area.north - area.south)) / N;
-        for (let col = 0; col < N; col++) points.push(cityPoint(lat, area.west + ((col + 0.5) * (area.east - area.west)) / N, prepared, ground));
+      while (row < area.rows && performance.now() < until) {
+        const lat = area.north - ((row + 0.5) * (area.north - area.south)) / area.rows;
+        for (let col = 0; col < area.cols; col++) points.push(cityPoint(lat, area.west + ((col + 0.5) * (area.east - area.west)) / area.cols, prepared, ground));
         row++;
       }
-      setProgress(row / N);
-      if (row < N) timer = window.setTimeout(work, 0);
-      else setGrid({ ...area, cols: N, rows: N, points });
+      setProgress(row / area.rows);
+      if (row < area.rows) timer = window.setTimeout(work, 0);
+      else setGrid({ ...area, points });
     };
     timer = window.setTimeout(work, 0);
     return () => clearTimeout(timer);
   }, [prepared, ground]);
 
-  const deepestFt = grid ? Math.max(STEP_FT, ...grid.points.map((p) => (p?.codes.length ?? 0) * STEP_FT)) : STEP_FT;
+  const map = grid && grid !== "empty" ? grid : null;
+  const deepestFt = useMemo(() => (map ? Math.max(STEP_FT, ...map.points.map((p) => (p?.codes.length ?? 0) * STEP_FT)) : STEP_FT), [map]);
   const depth = Math.min(depthFt, deepestFt - STEP_FT);
+  const bounds = useMemo(() => (map ? ([[map.south, map.west], [map.north, map.east]] as [[number, number], [number, number]]) : null), [map]);
   const picture = useMemo(() => {
-    if (!grid) return null;
+    if (!map) return null;
     const canvas = document.createElement("canvas");
-    [canvas.width, canvas.height] = [grid.cols, grid.rows];
-    canvas.getContext("2d")!.putImageData(new ImageData(paint(grid, mode, depth), grid.cols, grid.rows), 0, 0);
+    [canvas.width, canvas.height] = [map.cols, map.rows];
+    canvas.getContext("2d")!.putImageData(new ImageData(paint(map, mode, depth), map.cols, map.rows), 0, 0);
     return canvas.toDataURL();
-  }, [grid, mode, depth]);
-  const cellM = grid ? Math.round((kmBetween(grid.south, grid.west, grid.south, grid.east) / grid.cols) * 1000) : 0;
+  }, [map, mode, depth]);
+  const cellM = map ? Math.round((kmBetween(map.south, map.west, map.south, map.east) / map.cols) * 1000) : 0;
 
   return (
     <div className="flex min-h-0 flex-1">
       <div className="min-w-0 flex-1">
         <SiteMap sites={records.sites} selectedId={null} picked={null} onSelect={() => {}} onPick={() => {}}>
-          {grid && picture && (
-            <ImageOverlay url={picture} bounds={[[grid.south, grid.west], [grid.north, grid.east]]} className="[image-rendering:pixelated]" />
+          {/* Under the borewell pins (the overlay pane is 400), above the streets. */}
+          {bounds && picture && (
+            <Pane name="city-map" style={{ zIndex: 350 }}>
+              <ImageOverlay url={picture} bounds={bounds} className="[image-rendering:pixelated]" />
+            </Pane>
           )}
         </SiteMap>
       </div>
       <aside className="w-[22rem] shrink-0 space-y-4 overflow-y-auto border-l p-4 text-sm">
-        <div className="flex flex-col gap-1" role="radiogroup" aria-label={t.modeLabel}>
+        <fieldset className="space-y-1.5">
+          <legend className="mb-1 font-medium">{t.modeLabel}</legend>
           {(["ground", "wet", "thin"] as const).map((m) => (
-            <Button key={m} variant={mode === m ? "secondary" : "ghost"} size="sm" className="justify-start" role="radio" aria-checked={mode === m} onClick={() => setMode(m)}>
+            <label key={m} className="flex items-center gap-2">
+              <input type="radio" name="city-mode" checked={mode === m} onChange={() => setMode(m)} />
               {t.modes[m]}
-            </Button>
+            </label>
           ))}
-        </div>
+        </fieldset>
         <p className="text-muted-foreground">{t.about[mode]}</p>
-        {mode !== "wet" && (
+        {mode !== "wet" && map && (
           <label className="block space-y-1">
             <span>{t.depth(depth)}</span>
             <input type="range" className="w-full" min={0} max={deepestFt - STEP_FT} step={STEP_FT} value={depth} onChange={(e) => setDepthFt(Number(e.target.value))} />
           </label>
         )}
         {model === "failed" ? <p>{text.groundFailed}</p>
+          : grid === "empty" ? <p>{t.empty}</p>
           : !grid || progress < 1 ? <p className="text-muted-foreground">{t.working(Math.round(progress * 100))}</p>
           : null}
-        <Key mode={mode} />
-        {grid && <p className="text-muted-foreground">{t.squares(cellM)}</p>}
+        {map && <Key mode={mode} />}
+        {map && <p className="text-muted-foreground">{t.squares(cellM)}</p>}
         <p className="text-muted-foreground">{text.quality.fixed}</p>
         <button type="button" className="text-primary underline underline-offset-2" onClick={onHowGood}>{text.howGood}</button>
       </aside>
@@ -103,12 +108,12 @@ function Key({ mode }: { mode: CityMode }) {
       {mode === "wet" && (
         <li className="space-y-1">
           <div className="h-3 rounded-sm" aria-hidden="true" style={{ background: `linear-gradient(to right, ${WET_RAMP.map(([, c]) => `rgb(${c.join(",")})`).join(",")})` }} />
-          <div className="flex justify-between text-muted-foreground">{WET_RAMP.map(([f]) => <span key={f}>{f}</span>)}</div>
+          <div className="flex justify-between text-muted-foreground">{WET_RAMP.map(([f], i) => <span key={f}>{f}{i === WET_RAMP.length - 1 ? "+" : ""}</span>)}</div>
           <p>{t.wetKey}</p>
         </li>
       )}
       {mode === "thin" && <li className="flex items-center gap-2">{swatch("#0d6883", 0.8)}{text.levels.likely}</li>}
-      <li className="flex items-center gap-2 text-muted-foreground">{t.paler}</li>
+      <li className="flex items-center gap-2 text-muted-foreground">{swatch(mode === "ground" ? GROUP_COLOUR.clay : mode === "wet" ? "rgb(46,102,179)" : "#0d6883", 0.35)}{t.paler}</li>
       <li className="flex items-center gap-2 text-muted-foreground">{t.clear[mode]}</li>
     </ul>
   );

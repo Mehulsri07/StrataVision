@@ -121,6 +121,7 @@ export const text = {
       thin: "Clear: not enough data at this depth",
     },
     squares: (metres: number) => `Each square is about ${metres} m across.`,
+    empty: "There are no borewells with a location and layers to map yet.",
   },
 
   quality: {
