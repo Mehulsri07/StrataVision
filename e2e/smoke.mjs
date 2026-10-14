@@ -4,7 +4,7 @@
 //    records yet, and leaves no trace (the folder is not created).
 // 2. Started on made-up borewells, clicking a spot on the map shows proposed layers there,
 //    Data quality reports on them, and a line drawn on the Section map draws the section, flat
-//    and as a 3D slice.
+//    and as a 3D slice, and the city map is painted.
 //
 // Build first: npm run tauri -w app -- build --debug --no-bundle
 import { execFileSync, spawn } from "node:child_process";
@@ -127,6 +127,10 @@ const scenarios = {
         if (!(await js("!!document.querySelector('svg[aria-label^=\"Section along\"]')"))) throw new Error("the section was not drawn");
         await js("[...document.querySelectorAll('button')].find((b) => b.innerText.trim() === '3D slice').click()");
         await expectScreen("Drag to turn and tilt the slice");
+        // The city map, worked out over the made-up borewells.
+        await js("[...document.querySelectorAll('header button')].find((b) => b.innerText.trim() === 'City map').click()");
+        await expectScreen("Each square is about");
+        await expectScreen("Depth: 50 ft below ground");
       });
     } finally {
       rmSync(dataDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 500 }); // the app may still be letting go
