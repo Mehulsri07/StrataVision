@@ -73,7 +73,7 @@ export function wetColour(feet: number) {
 const THIN_RGB = [13, 104, 131];
 
 /** The map as RGBA pixels, one per point, rows from the north. `depthFt` is used by "ground" and "thin". */
-export function paint(g: CityGrid, mode: CityMode, depthFt: number): Uint8ClampedArray {
+export function paint(g: CityGrid, mode: CityMode, depthFt: number): Uint8ClampedArray<ArrayBuffer> {
   const out = new Uint8ClampedArray(g.points.length * 4), step = Math.floor(depthFt / STEP_FT);
   g.points.forEach((p, i) => {
     let colour: number[] | null = null, alpha = 0;

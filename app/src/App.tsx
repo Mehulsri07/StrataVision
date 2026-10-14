@@ -7,16 +7,18 @@ import { text } from "@/text";
 import { MapView } from "@/views/MapView";
 import { QualityView } from "@/views/QualityView";
 import { SectionView } from "@/views/SectionView";
+import { CityView } from "@/views/CityView";
 
 type State = { records: Records; as: string } | { problem: LoadError } | null;
-type View = "map" | "section" | "quality";
+type View = "map" | "section" | "city" | "quality";
 
 export default function App() {
   const [state, setState] = useState<State>(null);
   const [view, setView] = useState<View>("map");
-  // The section's map is first drawn when it is first shown: a map set up while hidden has no size to fit the borewells to.
-  const [sectionSeen, setSectionSeen] = useState(false);
-  if (view === "section" && !sectionSeen) setSectionSeen(true);
+  // A screen's map is first drawn when it is first shown: a map set up while hidden has no size to
+  // fit the borewells to. (The city map is also worked out only then.)
+  const [seen, setSeen] = useState<ReadonlySet<View>>(new Set(["map"]));
+  if (!seen.has(view)) setSeen(new Set([...seen, view]));
 
   // Reading again keeps what is on screen until the new records arrive, so the map does not blink.
   // Records that turn out unchanged are kept as they are, so nothing is worked out again for them.
@@ -46,7 +48,7 @@ export default function App() {
         <h1 className="text-base font-semibold">{text.appName}</h1>
         {records && (
           <nav className="flex gap-1">
-            {(["map", "section", "quality"] as const).map((v) => (
+            {(["map", "section", "city", "quality"] as const).map((v) => (
               <Button key={v} variant={view === v ? "secondary" : "ghost"} size="sm" aria-current={view === v ? "page" : undefined} onClick={() => setView(v)}>
                 {text.tabs[v]}
               </Button>
@@ -62,7 +64,8 @@ export default function App() {
           <>
             {/* The maps stay mounted behind the other screens, so they keep their place, the picked spot and the line. */}
             <div className={view === "map" ? "flex min-h-0 flex-1" : "hidden"}><MapView records={records} model={model} onHowGood={() => setView("quality")} /></div>
-            {sectionSeen && <div className={view === "section" ? "flex min-h-0 flex-1" : "hidden"}><SectionView records={records} model={model} onHowGood={() => setView("quality")} /></div>}
+            {seen.has("section") && <div className={view === "section" ? "flex min-h-0 flex-1" : "hidden"}><SectionView records={records} model={model} onHowGood={() => setView("quality")} /></div>}
+            {seen.has("city") && <div className={view === "city" ? "flex min-h-0 flex-1" : "hidden"}><CityView records={records} model={model} onHowGood={() => setView("quality")} /></div>}
             {view === "quality" && <QualityView model={model} />}
           </>
         )}

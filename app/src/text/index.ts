@@ -3,7 +3,7 @@ export const text = {
   appName: "StrataVision",
   loading: "Reading your borewell records…",
   refresh: "Refresh",
-  tabs: { map: "Map", section: "Section", quality: "Data quality" },
+  tabs: { map: "Map", section: "Section", city: "City map", quality: "Data quality" },
 
   /** Why the records could not be shown, by the kind of problem the Rust side reports. */
   problems: {
@@ -101,6 +101,26 @@ export const text = {
     saveFailed: "The file could not be saved.",
     pdfTitle: "Section A to A′",
     pdfKey: "Solid columns are borewells as measured. Everything between them is proposed from past drilling: faded where likely, paler where a rough guess, hatched where there is not enough data. Heights are feet above sea level.",
+  },
+
+  city: {
+    modeLabel: "What the map shows",
+    modes: { ground: "Ground at a depth", wet: "Depth to water-bearing sand", thin: "Where data is thin" },
+    about: {
+      ground: "What the ground is most likely made of at the chosen depth below ground.",
+      wet: "How deep the first water-bearing sand at least 10 ft thick is likely to be.",
+      thin: "How sure the proposals are at the chosen depth, on their own, so the gaps in the records stand out.",
+    },
+    depth: (feet: number) => `Depth: ${feet} ft below ground`,
+    working: (percent: number) => `Working out the map… ${percent}%`,
+    wetKey: "Feet below ground",
+    paler: "Paler: a rough guess",
+    clear: {
+      ground: "Clear: not enough data at this depth",
+      wet: "Clear: no such sand proposed, or not enough data",
+      thin: "Clear: not enough data at this depth",
+    },
+    squares: (metres: number) => `Each square is about ${metres} m across.`,
   },
 
   quality: {
