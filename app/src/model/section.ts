@@ -53,9 +53,37 @@ function placesAlong(path: LatLon[], count: number) {
 /** Points closer than this to the one before are the same point clicked twice, not a bend. */
 export const SAME_POINT_KM = 0.005;
 
-export function sectionAlong(given: LatLon[], halfWidthKm: number, prepared: Prepared[], grid: ElevationGrid, borewells: Borewell[], count = 200): Section {
+/** The line without points clicked twice. */
+export function distinctPoints(given: LatLon[]): LatLon[] {
   const path: LatLon[] = [];
   for (const p of given) if (!path.length || kmBetween(...path[path.length - 1], ...p) >= SAME_POINT_KM) path.push(p);
+  return path;
+}
+
+/**
+ * The heights, feet above sea level, that a drawing of these sections needs: from a little above
+ * the highest ground to the deepest anything reaches, and at least 50 ft.
+ */
+export function heightRange(sections: Section[]): { highFt: number; lowFt: number } | null {
+  const grounds: number[] = [], bottoms: number[] = [];
+  for (const s of sections) {
+    for (const c of s.columns) {
+      if (c.groundFt == null) continue;
+      grounds.push(c.groundFt);
+      if (c.steps?.length) bottoms.push(c.groundFt - c.steps[c.steps.length - 1].bottom);
+    }
+    for (const b of s.borewells) {
+      grounds.push(b.p.groundFt);
+      bottoms.push(b.p.bottomFt);
+    }
+  }
+  if (!grounds.length) return null;
+  const highFt = Math.max(...grounds) + 5;
+  return { highFt, lowFt: Math.min(highFt - 50, ...bottoms) };
+}
+
+export function sectionAlong(given: LatLon[], halfWidthKm: number, prepared: Prepared[], grid: ElevationGrid, borewells: Borewell[], count = 200): Section {
+  const path = distinctPoints(given);
   if (path.length < 2) return { lengthKm: 0, columns: [], borewells: [], nearby: 0, bendsKm: [] };
   const columns = placesAlong(path, count).map(({ km, latitude, longitude }) => {
     const groundM = heightAt(grid, latitude, longitude);

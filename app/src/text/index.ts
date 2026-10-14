@@ -103,6 +103,16 @@ export const text = {
     pdfKey: "Solid columns are borewells as measured. Everything between them is proposed from past drilling: faded where likely, paler where a rough guess, hatched where there is not enough data. Heights are feet above sea level.",
   },
 
+  slice: {
+    modes: { flat: "Flat drawing", slice: "3D slice" },
+    depth: "Depth of the slice behind the line",
+    stretch: (n: number) => `Heights stretched ${n}×`,
+    howTo: "Drag to turn and tilt the slice; the arrow keys work too. The front is the section along the line; the back and ends are cuts through the proposed ground.",
+    reset: "Reset view",
+    label: "The ground along the line as a slice that can be turned. Use the arrow keys to turn and tilt it.",
+    roleDescription: "3D view",
+  },
+
   city: {
     modeLabel: "What the map shows",
     modes: { ground: "Ground at a depth", wet: "Depth to water-bearing sand", thin: "Where data is thin" },

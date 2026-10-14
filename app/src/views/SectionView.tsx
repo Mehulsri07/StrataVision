@@ -4,9 +4,11 @@ import { corridorPolygons, kmBetween, type LatLon } from "@strata/core";
 import { Button } from "@/components/ui/button";
 import { SectionDrawing } from "@/components/SectionDrawing";
 import { SiteMap } from "@/components/SiteMap";
+import { SliceView } from "@/components/SliceView";
 import type { Records } from "@/lib/api";
 import type { Model } from "@/lib/useModel";
 import { SAME_POINT_KM, sectionAlong } from "@/model/section";
+import { sliceAlong } from "@/model/slice";
 import { text } from "@/text";
 
 const WIDTHS = [0.25, 0.5, 1, 2];
@@ -18,6 +20,8 @@ export function SectionView({ records, model, onHowGood }: { records: Records; m
   const [path, setPath] = useState<LatLon[]>([]);
   const [widthKm, setWidthKm] = useState(0.5);
   const [note, setNote] = useState<string | null>(null);
+  const [mode, setMode] = useState<"flat" | "slice">("flat");
+  const [depthKm, setDepthKm] = useState(0.5);
   const drawing = useRef<SVGSVGElement>(null);
   const t = text.section;
 
@@ -28,6 +32,11 @@ export function SectionView({ records, model, onHowGood }: { records: Records; m
     return s && s.lengthKm > 0 ? s : null;
   }, [ready, path, widthKm, borewells]);
   const anything = section && (section.borewells.length > 0 || section.columns.some((c) => c.steps?.length));
+  // Worked out only when it is to be shown: it is several sections' worth of work.
+  const slice = useMemo(
+    () => (ready && anything && mode === "slice" ? sliceAlong(path, widthKm, depthKm, ready.prepared, ready.grid, borewells) : null),
+    [ready, anything, mode, path, widthKm, depthKm, borewells],
+  );
 
   // A double-click, or a pin clicked twice, is one point, not a bend.
   const add = (point: LatLon) => {
@@ -98,7 +107,7 @@ export function SectionView({ records, model, onHowGood }: { records: Records; m
               {section.borewells.length < section.nearby && <p className="text-muted-foreground">{t.thinned(section.borewells.length)}</p>}
             </div>
           )}
-          {anything && (
+          {anything && mode === "flat" && (
             <div className="flex flex-wrap gap-2">
               <Button variant="outline" size="sm" onClick={() => save("png")}>{t.savePicture}</Button>
               <Button variant="outline" size="sm" onClick={() => save("pdf")}>{t.savePdf}</Button>
@@ -112,7 +121,26 @@ export function SectionView({ records, model, onHowGood }: { records: Records; m
         {model === "failed" ? <p>{text.groundFailed}</p>
           : !ready ? <p className="text-muted-foreground">{text.readingGround}</p>
           : !section ? null
-          : anything ? <SectionDrawing section={section} ref={drawing} />
+          : anything ? (
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center gap-3 text-sm">
+                <div className="flex gap-1">
+                  {(["flat", "slice"] as const).map((m) => (
+                    <Button key={m} variant={mode === m ? "secondary" : "ghost"} size="sm" aria-pressed={mode === m} onClick={() => setMode(m)}>{text.slice.modes[m]}</Button>
+                  ))}
+                </div>
+                {mode === "slice" && (
+                  <label className="flex items-center gap-2">
+                      {text.slice.depth}
+                      <select className="rounded-md border bg-background px-2 py-1" value={depthKm} onChange={(e) => setDepthKm(Number(e.target.value))}>
+                        {WIDTHS.map((w) => <option key={w} value={w}>{t.widthOption(w)}</option>)}
+                    </select>
+                  </label>
+                )}
+              </div>
+              {mode === "flat" ? <SectionDrawing section={section} ref={drawing} /> : slice ? <SliceView key={`${path.join()} ${depthKm} ${widthKm}`} slice={slice} /> : <p>{text.noGroundHere}</p>}
+            </div>
+          )
           : <p>{section.columns.every((c) => c.groundFt == null) ? text.noGroundHere : t.nothing}</p>}
       </div>
     </div>
