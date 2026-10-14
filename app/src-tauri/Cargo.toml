@@ -17,6 +17,8 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-fs = "2"
 serde = { version = "1", features = ["derive"] }
 strata_db = { path = "../../strata/core/db" }
 # Must stay the same version as strata_db's, so both use one SQLite and one Connection type.

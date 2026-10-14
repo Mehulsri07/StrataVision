@@ -8,12 +8,13 @@ import { checkModel, share } from "./check";
 import { madeUpCity, truth } from "./madeUpCity";
 import { GROUPS, type Group } from "./groups";
 import { predictColumn, prepare, type Prepared } from "./model";
+import { sectionAlong } from "./section";
 
 const city = (count: number) => {
   const { sites, grid } = madeUpCity(count);
-  return { grid, prepared: prepare(sites, DEFAULT_MATERIALS, grid) };
+  return { sites, grid, prepared: prepare(sites, DEFAULT_MATERIALS, grid) };
 };
-const { grid, prepared } = city(500);
+const { sites, grid, prepared } = city(500);
 const result = checkModel(prepared, grid);
 
 /**
@@ -101,8 +102,8 @@ describe("a made-up city of 500 borewells", () => {
   it("is fast enough", { timeout: 30_000 }, () => {
     const times = {
       column: timed(() => predictColumn(26.87, 80.97, prepared, grid)),
-      // A section: 200 columns along a line across the city.
-      section: timed(() => { for (let i = 0; i < 200; i++) predictColumn(26.76 + i * 0.0009, 80.86 + i * 0.0009, prepared, grid); }),
+      // A section: 200 columns along a line across the city, with the borewells near it and the water.
+      section: timed(() => sectionAlong([[26.76, 80.86], [26.94, 81.04]], 0.5, prepared, grid, sites.map((s) => s.borewell))),
       // A city map: 100 × 100 points.
       map: timed(() => { for (let i = 0; i < 100; i++) for (let j = 0; j < 100; j++) predictColumn(26.75 + i * 0.002, 80.85 + j * 0.002, prepared, grid); }),
       check: timed(() => checkModel(prepared, grid)),
