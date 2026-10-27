@@ -285,7 +285,8 @@ $env:STRATA_DATA_DIR = "$env:TEMP\strata-vision-dev"; npm run dev
 ## Data sources
 
 - **Borewell records:** StrataField's database, on the same computer.
-- **Maps:** © OpenStreetMap contributors (ODbL). Map tiles are loaded online, so the map needs
+- **Maps:** © OpenStreetMap contributors (ODbL). Map tiles are loaded online and kept on this
+  computer as they are shown, so places looked at before still have their streets without
   internet; everything else works offline.
 - **Ground heights:** StrataField's Lucknow elevation grid, from
   [Terrain Tiles on AWS](https://registry.opendata.aws/terrain-tiles/) (SRTM, NASA). Approximate to a

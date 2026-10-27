@@ -23,6 +23,8 @@ serde = { version = "1", features = ["derive"] }
 strata_db = { path = "../../strata/core/db" }
 # Must stay the same version as strata_db's, so both use one SQLite and one Connection type.
 rusqlite = { version = "0.40.2", features = ["bundled"] }
+# Finding a place by name (OpenStreetMap's Nominatim).
+ureq = { version = "3", features = ["json"] }
 
 [dev-dependencies]
 tempfile = "3"

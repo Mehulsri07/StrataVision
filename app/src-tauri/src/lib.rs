@@ -1,4 +1,5 @@
 mod data;
+mod tiles;
 
 use tauri::Manager;
 
@@ -14,6 +15,24 @@ pub fn run() {
         // Saving a section as a picture or PDF: the Save dialog, and writing the file chosen there.
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
+        // Map tiles, kept on this computer for use without internet (see tiles.rs).
+        .register_asynchronous_uri_scheme_protocol("tiles", |ctx, request, responder| {
+            let cache = ctx
+                .app_handle()
+                .path()
+                .app_cache_dir()
+                .map(|d| d.join("tiles"));
+            let path = request.uri().path().to_string();
+            std::thread::spawn(move || match cache {
+                Ok(cache) => responder.respond(tiles::tile(&cache, &path)),
+                Err(_) => responder.respond(
+                    tauri::http::Response::builder()
+                        .status(500)
+                        .body(Vec::new())
+                        .unwrap(),
+                ),
+            });
+        })
         .setup(|app| Ok(open_main_window(app)?))
         .invoke_handler(tauri::generate_handler![load_data])
         .run(tauri::generate_context!())
