@@ -1,4 +1,5 @@
 mod data;
+mod places;
 
 use tauri::Manager;
 
@@ -9,13 +10,21 @@ fn load_data(app: tauri::AppHandle) -> Result<data::Records, data::LoadError> {
     data::load(&data::data_dir(&roaming))
 }
 
+/// Places in and around Lucknow matching what was typed, from OpenStreetMap; fails without internet.
+#[tauri::command]
+async fn find_place(query: String) -> Result<Vec<places::Place>, String> {
+    tauri::async_runtime::spawn_blocking(move || places::find(&query))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
 pub fn run() {
     tauri::Builder::default()
         // Saving a section as a picture or PDF: the Save dialog, and writing the file chosen there.
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .setup(|app| Ok(open_main_window(app)?))
-        .invoke_handler(tauri::generate_handler![load_data])
+        .invoke_handler(tauri::generate_handler![load_data, find_place])
         .run(tauri::generate_context!())
         .expect("StrataVision could not start");
 }

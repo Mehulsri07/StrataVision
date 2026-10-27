@@ -21,3 +21,12 @@ export type LoadError = { kind: "noDatabase" | "newer" | "older" } | { kind: "ot
 
 /** Every borewell that is not in the Recycle bin, and the soil types. Rejects with a `LoadError`. */
 export const loadData = () => invoke<Records>("load_data");
+
+export interface Place {
+  name: string;
+  latitude: number;
+  longitude: number;
+}
+
+/** Places in and around Lucknow matching `query`, from OpenStreetMap. Rejects without internet. */
+export const findPlace = (query: string) => invoke<Place[]>("find_place", { query });
