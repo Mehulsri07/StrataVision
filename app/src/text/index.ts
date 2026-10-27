@@ -122,6 +122,13 @@ export const text = {
     roleDescription: "3D view",
   },
 
+  search: {
+    placeholder: "Find a place in Lucknow",
+    searching: "Searching…",
+    none: "No place by that name found in or around Lucknow.",
+    failed: "Could not search. Finding places needs the internet.",
+  },
+
   city: {
     modeLabel: "What the map shows",
     modes: {

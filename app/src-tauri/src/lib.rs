@@ -1,4 +1,5 @@
 mod data;
+mod places;
 
 use tauri::Manager;
 
@@ -7,6 +8,14 @@ use tauri::Manager;
 fn load_data(app: tauri::AppHandle) -> Result<data::Records, data::LoadError> {
     let roaming = app.path().data_dir()?;
     data::load(&data::data_dir(&roaming))
+}
+
+/// Places in and around Lucknow matching what was typed, from OpenStreetMap; fails without internet.
+#[tauri::command]
+async fn find_place(query: String) -> Result<Vec<places::Place>, String> {
+    tauri::async_runtime::spawn_blocking(move || places::find(&query))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 /// When StrataField last saved (see `data::saved_at`), so the window can tell when to read again.
@@ -22,7 +31,11 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .setup(|app| Ok(open_main_window(app)?))
-        .invoke_handler(tauri::generate_handler![load_data, records_saved_at])
+        .invoke_handler(tauri::generate_handler![
+            load_data,
+            records_saved_at,
+            find_place
+        ])
         .run(tauri::generate_context!())
         .expect("StrataVision could not start");
 }

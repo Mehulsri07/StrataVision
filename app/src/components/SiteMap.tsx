@@ -3,6 +3,7 @@ import { useEffect, useMemo, type ReactNode } from "react";
 import { CircleMarker, MapContainer, TileLayer, Tooltip, useMap, useMapEvents } from "react-leaflet";
 import type { LatLngBoundsExpression, LatLngExpression } from "leaflet";
 import type { SiteRecord } from "@/lib/api";
+import { PlaceSearch } from "./PlaceSearch";
 
 /** Centre of Lucknow, the pilot city. */
 const CITY_CENTRE: LatLngExpression = [26.85, 80.95];
@@ -33,6 +34,7 @@ export function SiteMap({ sites, selectedId, picked, onSelect, onPick, children,
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         maxZoom={19}
       />
+      <PlaceSearch />
       <FitOnce pins={pins} />
       <KeepSize />
       <PickOnMapClick onPick={onPick} />
