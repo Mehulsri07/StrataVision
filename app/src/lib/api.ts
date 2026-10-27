@@ -21,3 +21,6 @@ export type LoadError = { kind: "noDatabase" | "newer" | "older" } | { kind: "ot
 
 /** Every borewell that is not in the Recycle bin, and the soil types. Rejects with a `LoadError`. */
 export const loadData = () => invoke<Records>("load_data");
+
+/** When StrataField last saved, in milliseconds; 0 with no records. Cheap to ask often. */
+export const recordsSavedAt = () => invoke<number>("records_saved_at");

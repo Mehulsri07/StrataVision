@@ -104,6 +104,18 @@ pub fn load(data_dir: &Path) -> Result<Records, LoadError> {
     })
 }
 
+/// When StrataField last saved, as milliseconds since 1970: the newest change to the database or its
+/// write-ahead log (where saves go first). 0 when there is no database. Cheap enough to ask every
+/// few seconds, unlike reading the records.
+pub fn saved_at(data_dir: &Path) -> u64 {
+    [DB_FILE_NAME.to_string(), format!("{DB_FILE_NAME}-wal")]
+        .iter()
+        .filter_map(|f| std::fs::metadata(data_dir.join(f)).ok()?.modified().ok())
+        .max()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map_or(0, |d| d.as_millis() as u64)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -400,5 +412,28 @@ mod tests {
             Ok(())
         })
         .unwrap();
+    }
+
+    #[test]
+    fn saved_at_moves_on_when_stratafield_saves() {
+        let tmp = tempfile::tempdir().unwrap();
+        assert_eq!(saved_at(tmp.path()), 0);
+        let db = seeded(tmp.path());
+        let before = saved_at(tmp.path());
+        assert!(before > 0);
+        std::thread::sleep(Duration::from_millis(50));
+        db.with_tx(|tx| {
+            repo::create_with_layers(
+                tx,
+                &BorewellInput {
+                    borewell_id: "BW-3".into(),
+                    ..Default::default()
+                },
+                &[],
+                &[],
+            )
+        })
+        .unwrap();
+        assert!(saved_at(tmp.path()) > before);
     }
 }
