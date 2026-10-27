@@ -104,7 +104,7 @@ export function CityView({ records, model, onHowGood }: { records: Records; mode
           : !grid || progress < 1 ? <p className="text-muted-foreground">{t.working(Math.round(progress * 100))}</p>
           : null}
         {map && <Key mode={mode} />}
-        {map && mode === "trend" && <p className="text-muted-foreground">{t.repeat(same.length)}</p>}
+        {map && mode === "trend" && <p className="text-muted-foreground">{t.repeat(same.length, same.filter((s) => s.seasons === "same").length)}</p>}
         {map && <p className="text-muted-foreground">{t.squares(cellM)}</p>}
         <p className="text-muted-foreground">{text.quality.fixed}</p>
         <button type="button" className="text-primary underline underline-offset-2" onClick={onHowGood}>{text.howGood}</button>
