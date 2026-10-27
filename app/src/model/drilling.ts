@@ -158,3 +158,41 @@ export function suggestDrilling(column: readonly Step[], water: WaterHere | null
     noProposal: null,
   };
 }
+
+export interface PipePiece extends Span {
+  kind: "plain" | "slotted";
+}
+
+/**
+ * The whole pipe from the surface to the bottom of the bore: slotted where suggested, plain
+ * everywhere else, to the nearest foot, with the feet of each kind.
+ */
+export function pipePlan(slotted: Span[], drillToFt: number) {
+  const pieces: PipePiece[] = [];
+  let at = 0;
+  for (const s of slotted) {
+    const top = Math.round(s.top), bottom = Math.round(s.bottom);
+    if (top > at) pieces.push({ top: at, bottom: top, kind: "plain" });
+    pieces.push({ top, bottom, kind: "slotted" });
+    at = bottom;
+  }
+  const end = Math.round(drillToFt);
+  if (end > at) pieces.push({ top: at, bottom: end, kind: "plain" });
+  const feet = (kind: PipePiece["kind"]) => pieces.filter((p) => p.kind === kind).reduce((s, p) => s + p.bottom - p.top, 0);
+  return { pieces, plainFt: feet("plain"), slottedFt: feet("slotted") };
+}
+
+/** DWO's rates, rupees a foot; null until entered. */
+export interface Rates {
+  drillPerFt: number | null;
+  plainPerFt: number | null;
+  slottedPerFt: number | null;
+}
+
+/** What drilling and pipe would cost at the rates, in rupees; null until every rate is known. */
+export function costOf(drillToFt: number, plan: ReturnType<typeof pipePlan>, rates: Rates) {
+  const { drillPerFt, plainPerFt, slottedPerFt } = rates;
+  if (drillPerFt == null || plainPerFt == null || slottedPerFt == null) return null;
+  const drilling = Math.round(drillToFt) * drillPerFt, plain = plan.plainFt * plainPerFt, slotted = plan.slottedFt * slottedPerFt;
+  return { drilling, plain, slotted, total: drilling + plain + slotted };
+}

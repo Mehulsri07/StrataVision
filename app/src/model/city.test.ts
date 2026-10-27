@@ -3,12 +3,14 @@
  * says it is sure, does it improve with more borewells, and is it fast enough for the screens?
  */
 import { describe, expect, it } from "vitest";
-import { DEFAULT_MATERIALS, METRES_TO_FEET, heightAt } from "@strata/core";
+import { DEFAULT_MATERIALS, METRES_TO_FEET, heightAt, type WaterReading } from "@strata/core";
 import { checkModel, share } from "./check";
 import { madeUpCity, truth } from "./madeUpCity";
 import { GROUPS, type Group } from "./groups";
 import { predictColumn, prepare, type Prepared } from "./model";
 import { sectionAlong } from "./section";
+import { cityArea, cityPoint } from "./cityMap";
+import { readingsOf, sameBorewellTrends, trendAt } from "./waterTrend";
 
 const city = (count: number) => {
   const { sites, grid } = madeUpCity(count);
@@ -107,11 +109,26 @@ describe("a made-up city of 500 borewells", () => {
       // A city map: 100 × 100 points.
       map: timed(() => { for (let i = 0; i < 100; i++) for (let j = 0; j < 100; j++) predictColumn(26.75 + i * 0.002, 80.85 + j * 0.002, prepared, grid); }),
       check: timed(() => checkModel(prepared, grid)),
+      // The whole City map as its screen works it out: every square's column and water trend, with
+      // each borewell's water level read three times over the years.
+      cityMap: timed(() => {
+        const readings = readingsOf(sites.map((s, i) => ({
+          borewell: s.borewell,
+          waterReadings: [2018, 2021, 2024].map((y) => ({ measuredOn: `${y}-0${1 + (i % 9)}-01`, staticLevel: 40 + (i % 30) + (y - 2018) })) as WaterReading[],
+        })));
+        const same = sameBorewellTrends(readings), area = cityArea(prepared, grid)!;
+        for (let row = 0; row < area.rows; row++) for (let col = 0; col < area.cols; col++) {
+          const lat = area.north - ((row + 0.5) * (area.north - area.south)) / area.rows, lon = area.west + ((col + 0.5) * (area.east - area.west)) / area.cols;
+          cityPoint(lat, lon, prepared, grid);
+          trendAt(lat, lon, readings, same);
+        }
+      }),
     };
     console.log("made-up city, milliseconds:", times);
     expect(times.column).toBeLessThan(20 * SLOW);
     expect(times.section).toBeLessThan(1000 * SLOW);
     expect(times.map).toBeLessThan(5000 * SLOW);
     expect(times.check).toBeLessThan(5000 * SLOW);
+    expect(times.cityMap).toBeLessThan(8000 * SLOW);
   });
 });

@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { loadData, type LoadError, type Records } from "@/lib/api";
+import { loadData, recordsSavedAt, type LoadError, type Records } from "@/lib/api";
 import { useModel } from "@/lib/useModel";
 import { text } from "@/text";
 import { MapView } from "@/views/MapView";
 import { QualityView } from "@/views/QualityView";
 import { SectionView } from "@/views/SectionView";
 import { CityView } from "@/views/CityView";
+
+/** How often to look whether StrataField has saved. */
+const CHECK_EVERY_MS = 3000;
 
 type State = { records: Records; as: string } | { problem: LoadError } | null;
 type View = "map" | "section" | "city" | "quality";
@@ -37,6 +40,21 @@ export default function App() {
     load();
     window.addEventListener("focus", load);
     return () => window.removeEventListener("focus", load);
+  }, [load]);
+
+  // And while it shows, StrataField may save beside it: checked every few seconds, read only when saved.
+  useEffect(() => {
+    let last: number | null = null;
+    const check = () => {
+      if (document.visibilityState !== "visible") return;
+      recordsSavedAt().then((at) => {
+        if (last != null && at !== last) load();
+        last = at;
+      }, () => {});
+    };
+    check();
+    const timer = window.setInterval(check, CHECK_EVERY_MS);
+    return () => clearInterval(timer);
   }, [load]);
 
   const records = state && "records" in state && state.records.sites.length > 0 ? state.records : null;

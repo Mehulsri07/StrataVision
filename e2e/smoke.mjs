@@ -4,7 +4,7 @@
 //    records yet, and leaves no trace (the folder is not created).
 // 2. Started on made-up borewells, clicking a spot on the map shows proposed layers there,
 //    Data quality reports on them, and a line drawn on the Section map draws the section, flat
-//    and as a 3D slice, and the city map is painted.
+//    and as a 3D slice, and the city map is painted. A save made in StrataField shows by itself.
 //
 // Build first: npm run tauri -w app -- build --debug --no-bundle
 import { execFileSync, spawn } from "node:child_process";
@@ -12,6 +12,7 @@ import { existsSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import process from "node:process";
+import { DatabaseSync } from "node:sqlite";
 
 // Each start of the app gets its own port: the last one's window can take a moment to let go of its own.
 let port = 9332;
@@ -109,6 +110,18 @@ const scenarios = {
         await expectScreen("levels measured since 2023");
         await expectScreen("Drilling suggestion");
         await expectScreen("How deep to drill: about");
+        await expectScreen("Pipe, from the top down");
+        await expectScreen("ft plain,");
+        // Rates typed in give the cost; emptied first, as an earlier run's are kept on this computer.
+        const rates = async (values) => js(`(() => {
+          const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
+          const boxes = [...document.querySelectorAll('input[type="number"]')];
+          ${JSON.stringify(values)}.forEach((v, i) => { set.call(boxes[i], v); boxes[i].dispatchEvent(new Event("input", { bubbles: true })); });
+        })()`);
+        await rates(["", "", ""]);
+        await expectScreen("Enter DWO's rates");
+        await rates(["100", "200", "300"]);
+        await expectScreen("Total");
         // The middle pin is two borewells on top of each other; the panel offers both.
         await click(x - 60, y - 45);
         await expectScreen("2 borewells are at this spot:");
@@ -133,6 +146,12 @@ const scenarios = {
         await expectScreen("Depth: 50 ft below ground");
         await js("[...document.querySelectorAll('label')].find((l) => l.innerText.trim() === 'How fast the water level is changing').click()");
         await expectScreen("10 borewells have water levels measured a year or more apart"); // every third made-up one
+        // StrataField saves beside the open window: the screen follows without a click or a refocus.
+        const db = new DatabaseSync(join(dataDir, "strata.db"));
+        db.exec("UPDATE borewells SET latitude = NULL, longitude = NULL WHERE borewell_id = 'BW-001'");
+        db.close();
+        await js("[...document.querySelectorAll('header button')].find((b) => b.innerText.trim() === 'Map').click()");
+        await expectScreen("25 borewells on the map");
       });
     } finally {
       rmSync(dataDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 500 }); // the app may still be letting go

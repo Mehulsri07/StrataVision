@@ -76,6 +76,15 @@ export const text = {
     nearbyShallower: "The borewells nearby all stop above the water-bearing sand proposed here, so no slotted pipe or depth is suggested.",
     keyNearby: "Slotted pipe in the nearest borewells, at the same height",
     keySuggested: "Slotted pipe suggested",
+    pipeTitle: "Pipe, from the top down",
+    piece: (top: number, bottom: number, slotted: boolean) => `${top} to ${bottom} ft: ${slotted ? "slotted" : "plain"}`,
+    pipeTotal: (plain: number, slotted: number) => `In all: ${plain} ft plain, ${slotted} ft slotted`,
+    costTitle: "Cost estimate",
+    rate: { drillPerFt: "Drilling, ₹ a foot", plainPerFt: "Plain pipe, ₹ a foot", slottedPerFt: "Slotted pipe, ₹ a foot" },
+    costLine: { drilling: (feet: number) => `Drilling ${feet} ft`, plain: (feet: number) => `Plain pipe ${feet} ft`, slotted: (feet: number) => `Slotted pipe ${feet} ft` },
+    costTotal: "Total",
+    costNeedsRates: "Enter DWO's rates to see what this would cost. They are kept on this computer.",
+    costNote: "Drilling and pipe only, at the depths suggested; not the pump, labour or anything else.",
   },
 
   section: {
@@ -136,10 +145,10 @@ export const text = {
     depth: (feet: number) => `Depth: ${feet} ft below ground`,
     working: (percent: number) => `Working out the map… ${percent}%`,
     rampKey: { wet: "Feet below ground", thick: "Feet of water-bearing sand", trend: "Feet a year deeper (+) or shallower (−): red where the water is falling, blue where it is rising" },
-    strongTrend: "Strong: measured more than once at the same borewells",
-    palerTrend: "Paler: from different borewells measured in different years nearby (a rough guess)",
-    repeat: (n: number) =>
-      `${n === 1 ? "1 borewell has" : `${n} borewells have`} water levels measured a year or more apart. The map firms up as more repeat readings are added in StrataField.`,
+    strongTrend: "Strong: measured more than once at the same borewells, at the same time of year",
+    palerTrend: "Paler: a rough guess, from the same borewells at different times of year (the water rises after the monsoon), or from different borewells measured in different years nearby",
+    repeat: (n: number, sameSeason: number) =>
+      `${n === 1 ? "1 borewell has" : `${n} borewells have`} water levels measured a year or more apart, ${sameSeason} of them at the same time of year. The map firms up as more repeat readings are added in StrataField.`,
     paler: "Paler: a rough guess",
     clear: {
       ground: "Clear: not enough data at this depth",
