@@ -9,13 +9,20 @@ fn load_data(app: tauri::AppHandle) -> Result<data::Records, data::LoadError> {
     data::load(&data::data_dir(&roaming))
 }
 
+/// When StrataField last saved (see `data::saved_at`), so the window can tell when to read again.
+#[tauri::command]
+fn records_saved_at(app: tauri::AppHandle) -> Result<u64, String> {
+    let roaming = app.path().data_dir().map_err(|e| e.to_string())?;
+    Ok(data::saved_at(&data::data_dir(&roaming)))
+}
+
 pub fn run() {
     tauri::Builder::default()
         // Saving a section as a picture or PDF: the Save dialog, and writing the file chosen there.
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .setup(|app| Ok(open_main_window(app)?))
-        .invoke_handler(tauri::generate_handler![load_data])
+        .invoke_handler(tauri::generate_handler![load_data, records_saved_at])
         .run(tauri::generate_context!())
         .expect("StrataVision could not start");
 }
