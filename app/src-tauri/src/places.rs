@@ -63,6 +63,8 @@ mod tests {
     fn finds_a_locality() {
         let found = super::find("Gomti Nagar").unwrap();
         assert!(!found.is_empty());
-        assert!(found.iter().all(|p| (26.6..27.1).contains(&p.latitude) && (80.7..81.2).contains(&p.longitude)));
+        assert!(found
+            .iter()
+            .all(|p| (26.6..27.1).contains(&p.latitude) && (80.7..81.2).contains(&p.longitude)));
     }
 }
