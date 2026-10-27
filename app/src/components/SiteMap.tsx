@@ -2,7 +2,11 @@ import "leaflet/dist/leaflet.css";
 import { useEffect, useMemo, type ReactNode } from "react";
 import { CircleMarker, MapContainer, TileLayer, Tooltip, useMap, useMapEvents } from "react-leaflet";
 import type { LatLngBoundsExpression, LatLngExpression } from "leaflet";
+import { convertFileSrc } from "@tauri-apps/api/core";
 import type { SiteRecord } from "@/lib/api";
+
+/** The tiles through the app, which keeps them (`http://tiles.localhost/` on Windows). */
+const TILES = `${convertFileSrc("", "tiles")}{z}/{x}/{y}.png`;
 
 /** Centre of Lucknow, the pilot city. */
 const CITY_CENTRE: LatLngExpression = [26.85, 80.95];
@@ -11,7 +15,8 @@ const CITY_CENTRE: LatLngExpression = [26.85, 80.95];
 export const located = (sites: SiteRecord[]) => sites.filter((s) => s.borewell.latitude != null && s.borewell.longitude != null);
 
 /**
- * The borewells on OpenStreetMap's online tiles. Without internet the tiles are a plain background
+ * The borewells on OpenStreetMap's tiles, which are kept on this computer as they are shown (see
+ * src-tauri/src/tiles.rs). Without internet, places not looked at before have a plain background
  * and the pins still show. Clicking a pin selects that borewell; clicking anywhere else picks the spot.
  */
 export function SiteMap({ sites, selectedId, picked, onSelect, onPick, children, doubleClickZoom = true }: {
@@ -29,7 +34,7 @@ export function SiteMap({ sites, selectedId, picked, onSelect, onPick, children,
   return (
     <MapContainer center={CITY_CENTRE} zoom={12} doubleClickZoom={doubleClickZoom} preferCanvas className="strata-map z-0 h-full w-full cursor-crosshair bg-map-land">
       <TileLayer
-        url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+        url={TILES}
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         maxZoom={19}
       />
