@@ -1,7 +1,9 @@
 /**
  * How fast the water level is changing: feet per year it gets deeper (positive) or shallower.
- * Measured at the same borewells where they were read more than once, a year or more apart;
- * otherwise, roughly, from different borewells nearby measured in different years.
+ * Measured at the same borewells where they were read more than once, a year or more apart, in the
+ * same season (the water rises by tens of feet after the monsoon and falls again by May, so readings
+ * in different seasons would show that swing as a trend); next, roughly, at the same borewells in
+ * different seasons; otherwise, roughly, from different borewells nearby measured in different years.
  */
 import type { Borewell, WaterReading } from "@strata/core";
 
@@ -18,7 +20,8 @@ export interface Reading {
 
 export interface Trend {
   ftPerYear: number;
-  from: "same" | "area";
+  /** Same borewells in the same season; same borewells in different seasons; different borewells. */
+  from: "same" | "mixed" | "area";
 }
 
 /** Within this distance of a square its readings count. */
@@ -30,6 +33,8 @@ const CLOSEST_KM = 0.1;
  * few readings it would mostly show that difference as a strong trend. So it needs many.
  */
 const AREA = { readings: 15, years: 2 };
+/** Readings this many days apart on the calendar, or fewer, are in the same season. */
+const SEASON_DAYS = 45;
 
 const yearOf = (iso: string) => {
   const d = new Date(`${iso.trim().slice(0, 10)}T00:00:00Z`);
@@ -69,28 +74,46 @@ export function lineThrough(points: { year: number; feet: number }[]): number | 
 
 const span = (rs: Reading[]) => Math.max(...rs.map((r) => r.year)) - Math.min(...rs.map((r) => r.year));
 
-/** The change per year at each borewell read at least twice, a year or more apart. */
-export function sameBorewellTrends(readings: Reading[]): { latitude: number; longitude: number; ftPerYear: number }[] {
+/** Whether two readings fall at about the same time of year, whatever the years. */
+const sameSeason = (a: Reading, b: Reading) => {
+  const days = Math.abs((a.year % 1) - (b.year % 1)) * 365.25;
+  return Math.min(days, 365.25 - days) <= SEASON_DAYS;
+};
+
+/**
+ * The change per year at each borewell read at least twice, a year or more apart: the average over
+ * its pairs of readings in the same season a year or more apart, or, with no such pair, the straight
+ * line through all its readings (seasons "mixed").
+ */
+export function sameBorewellTrends(readings: Reading[]): { latitude: number; longitude: number; ftPerYear: number; seasons: "same" | "mixed" }[] {
   const byBorewell = new Map<string, Reading[]>();
   for (const r of readings) byBorewell.set(r.id, [...(byBorewell.get(r.id) ?? []), r]);
   return [...byBorewell.values()]
     .filter((rs) => rs.length >= 2 && span(rs) >= 1)
-    .map((rs) => ({ latitude: rs[0].latitude, longitude: rs[0].longitude, ftPerYear: lineThrough(rs)! }));
+    .map((rs) => {
+      const slopes: number[] = [];
+      for (const a of rs) for (const b of rs) if (b.year - a.year >= 1 && sameSeason(a, b)) slopes.push((b.feet - a.feet) / (b.year - a.year));
+      const [ftPerYear, seasons] = slopes.length ? [slopes.reduce((s, v) => s + v, 0) / slopes.length, "same" as const] : [lineThrough(rs)!, "mixed" as const];
+      return { latitude: rs[0].latitude, longitude: rs[0].longitude, ftPerYear, seasons };
+    });
 }
 
 export function trendAt(latitude: number, longitude: number, readings: Reading[], same: ReturnType<typeof sameBorewellTrends>): Trend | null {
   const kx = 111.32 * Math.cos((latitude * Math.PI) / 180);
   const km = (p: { latitude: number; longitude: number }) => Math.hypot((p.longitude - longitude) * kx, (p.latitude - latitude) * 110.57);
 
-  let total = 0, weighted = 0;
-  for (const t of same) {
-    const d = km(t);
-    if (d > NEAR_KM) continue;
-    const w = 1 / Math.max(d, CLOSEST_KM) ** 2;
-    total += w;
-    weighted += w * t.ftPerYear;
+  // Same-season trends first, then mixed ones, each nearer ones counting more.
+  for (const seasons of ["same", "mixed"] as const) {
+    let total = 0, weighted = 0;
+    for (const t of same) {
+      const d = km(t);
+      if (t.seasons !== seasons || d > NEAR_KM) continue;
+      const w = 1 / Math.max(d, CLOSEST_KM) ** 2;
+      total += w;
+      weighted += w * t.ftPerYear;
+    }
+    if (total > 0) return { ftPerYear: weighted / total, from: seasons };
   }
-  if (total > 0) return { ftPerYear: weighted / total, from: "same" };
 
   const near = readings.filter((r) => km(r) <= NEAR_KM);
   if (near.length < AREA.readings || span(near) < AREA.years) return null;

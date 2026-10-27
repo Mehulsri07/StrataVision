@@ -53,6 +53,21 @@ describe("trendAt", () => {
     expect(t.ftPerYear).toBeLessThan(2.5);
   });
 
+  it("compares the same season, so the rise after the monsoon is not taken for a trend", () => {
+    // Each May the water is at 50 ft, each October at 30 ft: no change from year to year.
+    const readings = readingsOf([site(bw("a", 0.2), [reading("2023-05-01", 50), reading("2023-10-15", 30), reading("2024-05-10", 50), reading("2024-10-20", 30)])]);
+    expect(sameBorewellTrends(readings)).toEqual([expect.objectContaining({ ftPerYear: expect.closeTo(0, 1), seasons: "same" })]);
+  });
+
+  it("falls back to readings in different seasons as a rough guess", () => {
+    const mixed = readingsOf([site(bw("a", 0.2), [reading("2023-05-01", 50), reading("2024-10-15", 30)])]);
+    expect(sameBorewellTrends(mixed)).toEqual([expect.objectContaining({ seasons: "mixed" })]);
+    expect(trendAt(CENTRE[0], CENTRE[1], mixed, sameBorewellTrends(mixed))).toMatchObject({ from: "mixed" });
+    // A same-season borewell nearby wins over it.
+    const both = [...mixed, ...readingsOf([site(bw("b", 1.5), [reading("2022-11-01", 30), reading("2024-11-01", 34)])])];
+    expect(trendAt(CENTRE[0], CENTRE[1], both, sameBorewellTrends(both))).toEqual({ from: "same", ftPerYear: expect.closeTo(2, 1) });
+  });
+
   it("ignores repeat readings less than a year apart", () => {
     const readings = readingsOf([site(bw("a", 0.2), [reading("2024-01-01", 40), reading("2024-06-01", 48)])]);
     expect(sameBorewellTrends(readings)).toEqual([]);

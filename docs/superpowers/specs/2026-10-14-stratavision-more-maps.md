@@ -23,15 +23,20 @@ level and date too unless a reading of that day already gives it. Undated levels
 At each square, within 2 km:
 
 1. **Measured at the same borewells** (strong colour): borewells with at least two readings a year
-   or more apart each give their own change per year (the straight line through their readings).
-   Where any are within 2 km, the square shows their average, nearer ones counting more (1/d²,
-   distances under 100 m counted as 100 m).
-2. **From different borewells over the years** (pale colour): otherwise, if at least 15 readings
+   or more apart each give their own change per year. The water rises by tens of feet after the
+   monsoon and falls again by May, so only pairs of readings at the same time of year (within 45
+   days on the calendar) are compared, and their changes per year averaged. Where any are within
+   2 km, the square shows their average, nearer ones counting more (1/d², distances under 100 m
+   counted as 100 m).
+2. **The same borewells at different times of year** (pale colour): otherwise, borewells whose
+   repeat readings are all in different seasons give the straight line through their readings,
+   averaged the same way. Rough: the seasonal swing is in it.
+3. **From different borewells over the years** (pale colour): otherwise, if at least 15 readings
    within 2 km span at least 2 years, the straight line through all of them by date. Rough: it
    compares different wells, which differ by tens of feet for reasons other than time; with fewer
    readings that difference would show as a strong trend (a simulation with no change at all gave
    ±5 ft a year or more on most squares with 5 readings).
-3. Otherwise clear.
+4. Otherwise clear.
 
 The key says which is which, and the panel says how many borewells have repeat readings, so it
 is clear the strong colour fills in as DWO records more readings in StrataField.
@@ -45,5 +50,5 @@ is added, so that first comparison is lost; StrataField should keep it as a read
 ## Tests
 
 Thickness counted and capped at the depth; rough and none rules. Change per year: a line through
-known readings; under a year apart ignored; same-borewell trends preferred to the area trend;
+known readings; under a year apart ignored; same-season pairs compared, mixed seasons only as a fallback; same-borewell trends preferred to the area trend;
 nearer counts more; fewer than 15 readings or under 2 years gives nothing; undated readings ignored.
