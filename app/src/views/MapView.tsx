@@ -4,7 +4,8 @@ import { NOTHING_PROPOSED, NothingProposedPattern, ProposedColumn, RecordedColum
 import { SiteMap, located } from "@/components/SiteMap";
 import type { Records, SiteRecord } from "@/lib/api";
 import type { Model } from "@/lib/useModel";
-import { nearbyWells, suggestDrilling, type Suggestion } from "@/model/drilling";
+import { costOf, nearbyWells, pipePlan, suggestDrilling, type Rates, type Span, type Suggestion } from "@/model/drilling";
+import { useRates } from "@/lib/rates";
 import { predictColumn } from "@/model/model";
 import { GROUP_COLOUR, blocks, distanceInWords, sharesInWords, summary, waterHere, type Block } from "@/model/words";
 import { text } from "@/text";
@@ -169,9 +170,45 @@ function Drilling({ s }: { s: Suggestion }) {
           <ul>{s.proposal.slotted.map((p) => <li key={p.top}>{t.slotted(ft(p.top), ft(p.bottom), text.levels[p.level])}</li>)}</ul>
           <p className="font-medium">{t.drillTo(ft(s.proposal.drillToFt), s.proposal.slotted[s.proposal.slotted.length - 1].level === "rough")}</p>
           <p className="text-muted-foreground">{t.drillToNote[s.proposal.limit]}</p>
+          <PipeAndCost slotted={s.proposal.slotted} drillToFt={s.proposal.drillToFt} />
         </>
       ) : <p>{t[s.noProposal ?? "noWaterBearing"]}</p>}
     </section>
+  );
+}
+
+/** The whole pipe for the suggested bore, and what drilling and pipe would cost at DWO's rates. */
+function PipeAndCost({ slotted, drillToFt }: { slotted: Span[]; drillToFt: number }) {
+  const t = text.drilling;
+  const [rates, setRates] = useRates();
+  const plan = pipePlan(slotted, drillToFt);
+  const cost = costOf(drillToFt, plan, rates);
+  const rupees = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
+  return (
+    <>
+      <h4 className="pt-1 font-medium">{t.pipeTitle}</h4>
+      <ul>{plan.pieces.map((p) => <li key={p.top}>{t.piece(p.top, p.bottom, p.kind === "slotted")}</li>)}</ul>
+      <p>{t.pipeTotal(plan.plainFt, plan.slottedFt)}</p>
+      <h4 className="pt-1 font-medium">{t.costTitle}</h4>
+      {(Object.keys(t.rate) as (keyof Rates)[]).map((k) => (
+        <label key={k} className="flex items-center justify-between gap-2">
+          <span>{t.rate[k]}</span>
+          <input type="number" min={0} inputMode="decimal" className="w-24 rounded border px-2 py-0.5 text-right"
+            value={rates[k] ?? ""} onChange={(e) => setRates({ ...rates, [k]: e.target.value === "" ? null : Math.max(0, Number(e.target.value)) })} />
+        </label>
+      ))}
+      {cost ? (
+        <table className="w-full">
+          <tbody>
+            <tr><td>{t.costLine.drilling(Math.round(drillToFt))}</td><td className="text-right">{rupees(cost.drilling)}</td></tr>
+            <tr><td>{t.costLine.plain(plan.plainFt)}</td><td className="text-right">{rupees(cost.plain)}</td></tr>
+            <tr><td>{t.costLine.slotted(plan.slottedFt)}</td><td className="text-right">{rupees(cost.slotted)}</td></tr>
+            <tr className="font-medium"><td>{t.costTotal}</td><td className="text-right">{rupees(cost.total)}</td></tr>
+          </tbody>
+        </table>
+      ) : <p className="text-muted-foreground">{t.costNeedsRates}</p>}
+      <p className="text-muted-foreground">{t.costNote}</p>
+    </>
   );
 }
 

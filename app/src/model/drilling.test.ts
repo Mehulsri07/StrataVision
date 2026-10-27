@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PipeSegment } from "@strata/core";
-import { nearbyWells, suggestDrilling, type NearbyWell, type SiteWithPipes } from "./drilling";
+import { costOf, nearbyWells, pipePlan, suggestDrilling, type NearbyWell, type SiteWithPipes } from "./drilling";
 import type { Group } from "./groups";
 import type { Step } from "./model";
 import { CENTRE, east, flatGrid, north, site, slopeGrid } from "./testGround";
@@ -139,5 +139,26 @@ describe("suggestDrilling", () => {
 
   it("has no suggestion with nobody nearby", () => {
     expect(suggestDrilling(COLUMN, water(50), [])).toBeNull();
+  });
+});
+
+describe("pipePlan", () => {
+  it("puts plain pipe wherever slotted is not suggested, down to the bottom", () => {
+    const plan = pipePlan([{ top: 60.4, bottom: 80 }, { top: 120, bottom: 150.2 }], 150.2);
+    expect(plan.pieces).toEqual([
+      { top: 0, bottom: 60, kind: "plain" }, { top: 60, bottom: 80, kind: "slotted" },
+      { top: 80, bottom: 120, kind: "plain" }, { top: 120, bottom: 150, kind: "slotted" },
+    ]);
+    expect(plan).toMatchObject({ plainFt: 100, slottedFt: 50 });
+  });
+});
+
+describe("costOf", () => {
+  const plan = pipePlan([{ top: 60, bottom: 80 }], 80);
+  it("adds up drilling and each kind of pipe at the rates given", () => {
+    expect(costOf(80, plan, { drillPerFt: 100, plainPerFt: 200, slottedPerFt: 300 })).toEqual({ drilling: 8000, plain: 12000, slotted: 6000, total: 26000 });
+  });
+  it("gives nothing until every rate is known", () => {
+    expect(costOf(80, plan, { drillPerFt: 100, plainPerFt: null, slottedPerFt: 300 })).toBeNull();
   });
 });

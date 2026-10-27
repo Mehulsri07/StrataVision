@@ -76,6 +76,15 @@ export const text = {
     nearbyShallower: "The borewells nearby all stop above the water-bearing sand proposed here, so no slotted pipe or depth is suggested.",
     keyNearby: "Slotted pipe in the nearest borewells, at the same height",
     keySuggested: "Slotted pipe suggested",
+    pipeTitle: "Pipe, from the top down",
+    piece: (top: number, bottom: number, slotted: boolean) => `${top} to ${bottom} ft: ${slotted ? "slotted" : "plain"}`,
+    pipeTotal: (plain: number, slotted: number) => `In all: ${plain} ft plain, ${slotted} ft slotted`,
+    costTitle: "Cost estimate",
+    rate: { drillPerFt: "Drilling, ₹ a foot", plainPerFt: "Plain pipe, ₹ a foot", slottedPerFt: "Slotted pipe, ₹ a foot" },
+    costLine: { drilling: (feet: number) => `Drilling ${feet} ft`, plain: (feet: number) => `Plain pipe ${feet} ft`, slotted: (feet: number) => `Slotted pipe ${feet} ft` },
+    costTotal: "Total",
+    costNeedsRates: "Enter DWO's rates to see what this would cost. They are kept on this computer.",
+    costNote: "Drilling and pipe only, at the depths suggested; not the pump, labour or anything else.",
   },
 
   section: {
