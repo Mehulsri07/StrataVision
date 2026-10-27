@@ -109,6 +109,18 @@ const scenarios = {
         await expectScreen("levels measured since 2023");
         await expectScreen("Drilling suggestion");
         await expectScreen("How deep to drill: about");
+        await expectScreen("Pipe, from the top down");
+        await expectScreen("ft plain,");
+        // Rates typed in give the cost; emptied first, as an earlier run's are kept on this computer.
+        const rates = async (values) => js(`(() => {
+          const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
+          const boxes = [...document.querySelectorAll('input[type="number"]')];
+          ${JSON.stringify(values)}.forEach((v, i) => { set.call(boxes[i], v); boxes[i].dispatchEvent(new Event("input", { bubbles: true })); });
+        })()`);
+        await rates(["", "", ""]);
+        await expectScreen("Enter DWO's rates");
+        await rates(["100", "200", "300"]);
+        await expectScreen("Total");
         // The middle pin is two borewells on top of each other; the panel offers both.
         await click(x - 60, y - 45);
         await expectScreen("2 borewells are at this spot:");
