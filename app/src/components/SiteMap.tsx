@@ -4,6 +4,7 @@ import { CircleMarker, MapContainer, TileLayer, Tooltip, useMap, useMapEvents } 
 import type { LatLngBoundsExpression, LatLngExpression } from "leaflet";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import type { SiteRecord } from "@/lib/api";
+import { PlaceSearch } from "./PlaceSearch";
 
 /** The tiles through the app, which keeps them (`http://tiles.localhost/` on Windows). */
 const TILES = `${convertFileSrc("", "tiles")}{z}/{x}/{y}.png`;
@@ -38,6 +39,7 @@ export function SiteMap({ sites, selectedId, picked, onSelect, onPick, children,
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         maxZoom={19}
       />
+      <PlaceSearch />
       <FitOnce pins={pins} />
       <KeepSize />
       <PickOnMapClick onPick={onPick} />
