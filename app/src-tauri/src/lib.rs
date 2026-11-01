@@ -1,5 +1,6 @@
 mod data;
 mod places;
+mod tiles;
 
 use tauri::Manager;
 
